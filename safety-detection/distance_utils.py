@@ -16,7 +16,7 @@ def xyxy2xywh(xyxy):
 def get_bottom_points(boxes, classes):
     bottom_points = []
     for i, box in enumerate(boxes):
-        if classes[i] in ['People']:
+        if classes[i] in ['people']:
             pnts = [int(box[0]+(box[2]*0.5)),int(box[1]+box[3])]
             bottom_points.append(pnts)
         else:
@@ -29,7 +29,7 @@ def get_project_points(boxes, reference_points, classes, wharf):
     roi_left = max(reference_points[0][0], reference_points[3][0])
     bottom_points = []
     for i, box in enumerate(boxes):
-        if classes[i] == 'Suspended Lean Object':
+        if classes[i] == 'suspended lean object':
             if not wharf:
                 pnts = [int(box[0]+box[2]*0.5),int(box[1]*0.5 + box[3]*0.25 + roi_bottom*0.5)]
                 bottom_points.append(pnts)
@@ -168,7 +168,7 @@ def get_distances_hatch(boxes, reference_points, perspective_transform, inverse_
     transformed_center_points = get_perspective_transform(center_points, perspective_transform)
     height_from_ground = [-1] * len(center_points)
     for i, cls in enumerate(classes):
-        if cls == 'Suspended Lean Object':
+        if cls == 'suspended lean object':
             bottom_points[i][1] = max(h/2, bottom_points[i][1])
             bottom_points[i][1] = min(h, bottom_points[i][1])
             bottom_points[i][0] = max(0, bottom_points[i][0])
@@ -179,14 +179,14 @@ def get_distances_hatch(boxes, reference_points, perspective_transform, inverse_
                 height_from_ground[i] = (roi_middle_y - (boxes[i][1] + boxes[i][3]/2)) * UNIT_LENGTH // average_human_height
                 # print((roi_middle_y - (boxes[i][1] + boxes[i][3]/2)), average_human_height)
     for i in range(len(bottom_points)):
-        if classes[i] != 'Suspended Lean Object':
+        if classes[i] != 'suspended lean object':
             continue
         danger_zone = None
         if height_from_ground[i] >= danger_zone_height_threshold:
             danger_zone = calculate_danger_zone_coordinates_hatch(boxes[i], bottom_points[i], distance_w, distance_h, w, h, danger_zone_width_threshold)
             danger_zones.append(danger_zone)
         for j in range(len(bottom_points)):
-            if classes[j] != 'People':
+            if classes[j] != 'people':
                 continue
             in_danger = is_inside_old(danger_zone, bottom_points[i], bottom_points[j]) if height_from_ground[i] >= danger_zone_height_threshold else False
             danger_zone_checks.append((i, j, None, in_danger)) 
@@ -203,21 +203,21 @@ def get_distances_wharf(boxes, reference_points, perspective_transform, inverse_
     center_points = get_center_points(boxes)
     height_from_ground = [-1] * len(center_points)
     for i, cls in enumerate(classes):
-        if cls == 'Suspended Lean Object':
+        if cls == 'suspended lean object':
             bottom_points[i][1] = max(h/2, bottom_points[i][1])
             bottom_points[i][1] = min(h, bottom_points[i][1])
             bottom_points[i][0] = max(0, bottom_points[i][0])
             bottom_points[i][0] = min(w, bottom_points[i][0])
             height_from_ground[i] = (roi_middle_y - (boxes[i][1] + boxes[i][3]/2)) * UNIT_LENGTH // average_human_height
     for i in range(len(bottom_points)):
-        if classes[i] != 'Suspended Lean Object':
+        if classes[i] != 'suspended lean object':
             continue
         danger_zone = None
         if height_from_ground[i] >= danger_zone_height_threshold:
             danger_zone = calculate_danger_zone_coordinates_wharf(boxes[i], bottom_points[i], w, h, distance_estimations[i], danger_zone_width_threshold)
             danger_zones.append(danger_zone)
         for j in range(len(bottom_points)):
-            if classes[j] != 'People':
+            if classes[j] != 'people':
                 continue
             in_danger = is_inside_old_wharf(danger_zone, bottom_points[i], bottom_points[j]) if height_from_ground[i] >= danger_zone_height_threshold else False
             danger_zone_checks.append((i, j, None, in_danger)) 
@@ -267,7 +267,7 @@ def get_distances(boxes, reference_points, perspective_transform, inverse_perspe
     transformed_center_points = get_perspective_transform(center_points, perspective_transform)
     height_from_ground = [-1] * len(center_points)
     for i, cls in enumerate(classes):
-        if cls == 'Suspended Lean Object':
+        if cls == 'suspended lean object':
             bottom_points[i][1] = max(h/2, bottom_points[i][1])
             bottom_points[i][1] = min(h, bottom_points[i][1])
             bottom_points[i][0] = max(0, bottom_points[i][0])
@@ -278,14 +278,14 @@ def get_distances(boxes, reference_points, perspective_transform, inverse_perspe
                 height_from_ground[i] = (roi_middle_y - (boxes[i][1] + boxes[i][3]/2)) * UNIT_LENGTH // average_human_height
 
     for i in range(len(bottom_points)):
-        if classes[i] != 'Suspended Lean Object':
+        if classes[i] != 'suspended lean object':
             continue
         danger_zone = None
         if height_from_ground[i] >= danger_zone_height_threshold:
             danger_zone = calculate_danger_zone_coordinates(boxes[i], bottom_points[i], distance_w, distance_h, w, h, danger_zone_width_threshold, wharf)
             danger_zones.append(danger_zone)
         for j in range(len(bottom_points)):
-            if classes[j] != 'People':
+            if classes[j] != 'people':
                 continue
             in_danger = is_inside_old(danger_zone, bottom_points[i], bottom_points[j]) if height_from_ground[i] >= danger_zone_height_threshold else False
             danger_zone_checks.append((i, j, None, in_danger)) 

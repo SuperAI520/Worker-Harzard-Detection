@@ -144,11 +144,7 @@ def push_alert(frame_id,fps,vessel_area,viol_cat,viol,folder_timestamp,vid_save_
     #print(db_data)
     response = requests.post(db_push_api, json=db_data,params={APINAME:APIKEY})
     # print(response.json())
-    try:
-        response = response.json()
-    except ValueError:
-        return False
-
+    response = response.json()
     try:
         if len(response['violation_id']) > 1:
             print(response)
@@ -171,7 +167,7 @@ def calculate_edge_to_person(roi_edge,frame, boxes,classes,frame_id,all_violatio
     vessel_area="hatch"
     #roi_edge = [self.reference_points[0],self.reference_points[1]]
     for i in range(len(boxes)):
-        if classes[i]=='People':
+        if classes[i]=='people':
             #i, j, dist, danger = pair
             #xi, yi, wi, hi = boxes[i]
             xj, yj, wj, hj = boxes[i]
