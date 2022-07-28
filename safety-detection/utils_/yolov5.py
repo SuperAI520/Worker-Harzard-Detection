@@ -1,5 +1,5 @@
-from models.experimental import attempt_load
-from utils.general import non_max_suppression
+from yolov5.models.experimental import attempt_load
+from yolov5.utils.general import non_max_suppression
 
 from icevision.all import *
 import gc
@@ -125,6 +125,7 @@ class Yolov5_IV:
                     box_wo_pad = box_original_size - padding * np.array([1,0,1,0])
             else:
                 box_wo_pad = box_original_size
+
             box_wo_pad = box_wo_pad.astype(int)
             boxes_final = []
             for i, box in enumerate(box_wo_pad):

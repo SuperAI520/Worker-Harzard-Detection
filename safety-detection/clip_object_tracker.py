@@ -1,3 +1,5 @@
+import sys
+sys.path.insert(0, './yolor')
 import argparse
 import time
 from pathlib import Path
@@ -9,21 +11,28 @@ import cv2
 import torch
 import numpy as np
 
-from utils.datasets import LoadImages
-from utils.general import set_logging, increment_path
-from utils.plots import plot_one_box
-from utils.torch_utils import select_device, time_synchronized
-
 # deep sort imports
 from deep_sort import preprocessing, nn_matching
 from deep_sort.detection import Detection
 from deep_sort.tracker import Tracker
 from tools import generate_clip_detections as gdet
 
-from utils.yolov5 import Yolov5, Yolov5_IV
+
 from distance import DistanceTracker
-from fastai.vision.all import *
 import constants
+from utils_.yolor import Yolor
+from utils_.yolov5 import Yolov5, Yolov5_IV
+if constants.USE_YOLOR_MODEL:
+    from yolor.utils.datasets import LoadImages
+    from yolor.utils.general import set_logging, increment_path
+    from yolor.utils.plots import plot_one_box
+    from yolor.utils.torch_utils import select_device, time_synchronized
+else:
+    from fastai.vision.all import *
+    from yolov5.utils.datasets import LoadImages
+    from yolov5.utils.general import set_logging, increment_path
+    from yolov5.utils.plots import plot_one_box
+    from yolov5.utils.torch_utils import select_device, time_synchronized
 
 classes = []
 
@@ -47,144 +56,17 @@ def xywh2xyxy(xywh):
 def is_inside(point, box):
         x, y, w, h = box
         return point[0] >= x and point[0] <= x+w and point[1] >= y and point[1] <= y+h
-"""
-def update_tracks(tracker, im0, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, distance_check, wharf):
-    # if len(tracker.tracks):
-    #     print("[Tracks]", len(tracker.tracks))
 
-    max_distances = {
-        'forklift': constants.MAX_DISTANCE_FOR_FORKLIFT,
-        'suspended lean object': constants.MAX_DISTANCE_FOR_SUSPENDED_LEAN_OBJECT,
-        'chain': constants.MAX_DISTANCE_FOR_CHAIN,
-        'people': constants.MAX_DISTANCE_FOR_PEOPLE,
-        'human carrier': constants.MAX_DISTANCE_FOR_HUMAN_CARRIER,
-    }
-
-    human_height_coefficient = constants.HUMAN_HEIGHT_COEFFICIENT
-    forklift_height_coefficient = constants.FORKLIFT_HEIGHT_COEFFICIENT
-    human_carrier_height_coefficient = constants.HUMAN_CARRIER_HEIGHT_COEFFICIENT
-
-    boxes = []
-    classes = []
-    ids = []
-    heights = []
-    areas = []
-    for track in tracker.tracks:
-        if not track.is_confirmed() or track.time_since_update > 1:
-            continue
-        xyxy = track.to_tlbr()
-        xywh = xyxy2xywh(xyxy)
-        class_num = track.class_num
-        class_name = names[int(class_num)]
-        if class_name in ignored_classes:
-            continue
-        boxes.append(xywh)
-        classes.append(class_name)
-        ids.append(track.track_id)
-        if class_name in ['people', 'human carrier', 'forklift']:
-            heights.append(xywh[3]/height)
-            areas.append(-1)
-        else:
-            heights.append(-1)
-            areas.append( (xywh[2] * xywh[3]) / (height * width) )
-
-    #far_check = [True] * len(classes)
-
-    # if there is no people, we have not reference measurement and we cannot do distance estimation
-    if not 'people' in classes:
-        distance_check = False
-
-    distance_estimations = []
-    if distance_check:
-        max_people_height = -1.0
-        i = 0
-        while i < len(classes):
-            if classes[i] == 'people' and heights[i] > max_people_height:
-                max_people_height = heights[i]
-            i+=1
-        first_object_distance = human_height_coefficient / max_people_height
-        first_objects = {cls: -1.0 for cls in classes if not cls in ['people', 'human carrier', 'forklift']}
-        for i, cls in enumerate(classes):
-            if not cls in ['people', 'human carrier', 'forklift']:
-                first_objects[cls] = max(first_objects[cls], areas[i])
-        for i, cls in enumerate(classes):
-            if not cls in ['people', 'human carrier', 'forklift']:
-                reference_area = first_objects[cls]
-                reference_distance = first_object_distance
-                object_area = areas[i]
-                object_distance = np.sqrt(np.square(reference_distance) * reference_area / object_area)
-                distance_estimations.append(object_distance)
-            elif cls == 'people':
-                object_distance = human_height_coefficient / heights[i]
-                distance_estimations.append(object_distance)
-            elif cls == 'human carrier':
-                object_distance = human_carrier_height_coefficient / heights[i]
-                distance_estimations.append(object_distance)
-                # print(object_distance, heights[i])
-            elif cls == 'forklift':
-                object_distance = forklift_height_coefficient / heights[i]
-                distance_estimations.append(object_distance)
-            #far_check[i] = object_distance < max_distances[cls]
-
-        for i, box_i in enumerate(boxes):
-            # check whether it is in a forklift
-            for j, box_j in enumerate(boxes):
-                if classes[j] == 'forklift' and classes[i] == 'people':
-                    p1 = (box_i[0] - 20, box_i[1] - 20)
-                    p2 = (box_i[0] - 20, box_i[1]+box_i[3] + 20)
-                    p3 = (box_i[0] + box_i[2] + 20, box_i[1] - 20)
-                    p4 = (box_i[0] + box_i[2] + 20, box_i[1]+box_i[3] + 20)
-                    inside_bbox = is_inside(p1, box_j) and is_inside(p2, box_j) and is_inside(p3, box_j) and is_inside(p4, box_j)
-                    if inside_bbox:
-                        distance_estimations[i] = distance_estimations[j]
-            if distance_estimations[i] > max_distances[classes[i]]:
-                classes[i] = 'far object'
-
-    suspended_threshold = suspended_threshold_wharf if wharf else suspended_threshold_hatch
-    for i in range(len(boxes)):
-        if classes[i] in ['suspended lean object', 'people', 'chain'] + ignored_classes + ['far object']:
-            continue
-        x, y, w, h = boxes[i]
-        if y <= suspended_threshold:
-            classes[i] = 'suspended lean object'
-    
-    # only for converting chain to suspended lean object. if the chain is ignored, no need for it!
-    if not 'suspended lean object' in classes and not 'chain' in ignored_classes:
-        for i, cls in enumerate(classes):
-            if cls == 'chain':
-                x, y, w, h = boxes[i]
-                bottom1 = (x, y+h)
-                bottom2 = (x+w, y+h)
-                if y <= suspended_threshold:
-                    not_inside = True
-                    for j, box in enumerate(boxes):
-                        if classes[j] != 'people' and i != j:
-                            if is_inside(bottom1, box) or is_inside(bottom2, box):
-                                print(bottom1, bottom2, box)
-                                not_inside = False
-                    if not_inside:
-                        classes[i] = 'suspended lean object'
-
-    for i, box in enumerate(boxes):
-        class_name = classes[i]
-        track_id = ids[i]
-        cur_distance = int(distance_estimations[i]) if distance_check else -1
-        if (not class_name in ignored_classes) and class_name !='far object':
-            xyxy = xywh2xyxy(box)
-            original_label = f'{class_name} #{track_id}'
-            label = f'{original_label} {cur_distance} CM' if distance_check else original_label
-            #plot_one_box(xyxy, im0, label=label,color=get_color_for(original_label), line_thickness=3)
-    return boxes, classes, distance_estimations,ids
-"""
 def update_tracks(tracker, im0, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, angle, distance_check, wharf, no_action, no_nested):
     if no_action:
         return [], [], [],[]
+    
     max_distances = {
-        'forklift': constants.MAX_DISTANCE_FOR_FORKLIFT,
-        'suspended lean object': constants.MAX_DISTANCE_FOR_SUSPENDED_LEAN_OBJECT,
+        'Forklift': constants.MAX_DISTANCE_FOR_FORKLIFT,
+        'Suspended Lean Object': constants.MAX_DISTANCE_FOR_SUSPENDED_LEAN_OBJECT,
         'chain': constants.MAX_DISTANCE_FOR_CHAIN,
-        'people': constants.MAX_DISTANCE_FOR_PEOPLE,
-        'human carrier': constants.MAX_DISTANCE_FOR_HUMAN_CARRIER,
+        'People': constants.MAX_DISTANCE_FOR_PEOPLE,
+        'Human Carrier': constants.MAX_DISTANCE_FOR_HUMAN_CARRIER,
     }
 
     human_height_coefficient = constants.HUMAN_HEIGHT_COEFFICIENT
@@ -214,7 +96,10 @@ def update_tracks(tracker, im0, width, height, ignored_classes, suspended_thresh
     suspended_threshold = suspended_threshold_wharf if wharf else suspended_threshold_hatch
     for i in range(len(boxes)):
         x, y, w, h = boxes[i]
-        if classes[i] in ['suspended lean object', 'people', 'chain'] + ignored_classes:
+        if classes[i] in ['Container', 'Small Pipe', 'Large Pipe', 'Wooden Board', 'Iron Rake', 'Wood', 'Coil']:
+            classes[i] = 'Suspended Lean Object'
+
+        if classes[i] in ['Suspended Lean Object', 'People', 'chain'] + ignored_classes:
             continue
         side_limit_check = True
         if wharf:
@@ -224,7 +109,7 @@ def update_tracks(tracker, im0, width, height, ignored_classes, suspended_thresh
                 side_limit_check = (x >= suspended_threshold_wharf_side)
         if y + h <= suspended_threshold and side_limit_check:
             if h / height >= 0.08:
-                classes[i] = 'suspended lean object'
+                classes[i] = 'Suspended Lean Object'
             """for j, chain_candidate in enumerate(boxes):
                 if not classes[j] == 'chain':
                     continue
@@ -238,7 +123,7 @@ def update_tracks(tracker, im0, width, height, ignored_classes, suspended_thresh
         xywh = boxes[i]
         if class_name in ignored_classes:
             continue
-        if class_name in ['people', 'human carrier', 'forklift']:
+        if class_name in ['People', 'Human Carrier', 'Forklift']:
             if xywh[3]/height > 0:
                 heights.append(xywh[3]/height)
             else:
@@ -252,7 +137,7 @@ def update_tracks(tracker, im0, width, height, ignored_classes, suspended_thresh
                 areas.append(1)
 
     # only for converting chain to suspended lean object. if the chain is ignored, no need for it!
-    if not 'suspended lean object' in classes and not 'chain' in ignored_classes:
+    if not 'Suspended Lean Object' in classes and not 'chain' in ignored_classes:
         for i, cls in enumerate(classes):
             if cls == 'chain':
                 x, y, w, h = boxes[i]
@@ -261,12 +146,12 @@ def update_tracks(tracker, im0, width, height, ignored_classes, suspended_thresh
                 if y <= suspended_threshold:
                     not_inside = True
                     for j, box in enumerate(boxes):
-                        if classes[j] != 'people' and i != j:
+                        if classes[j] != 'People' and i != j:
                             if is_inside(bottom1, box) or is_inside(bottom2, box):
                                 # print(bottom1, bottom2, box)
                                 not_inside = False
                     if not_inside:
-                        classes[i] = 'suspended lean object'
+                        classes[i] = 'Suspended Lean Object'
 
     try:
         if no_nested:
@@ -274,7 +159,7 @@ def update_tracks(tracker, im0, width, height, ignored_classes, suspended_thresh
             for i, box_i in enumerate(boxes):
                 # check whether it is in a forklift or a human carrier
                 for j, box_j in enumerate(boxes):
-                    if detections[j] == 'forklift' and detections[i] == 'forklift' and i != j:
+                    if detections[j] == 'Forklift' and detections[i] == 'Forklift' and i != j:
                         p1 = (box_i[0] , box_i[1] )
                         p2 = (box_i[0] , box_i[1]+box_i[3] )
                         p3 = (box_i[0] + box_i[2] , box_i[1] )
@@ -289,7 +174,7 @@ def update_tracks(tracker, im0, width, height, ignored_classes, suspended_thresh
         print('No nested error has been handled!')
 
     # if there is no people, we have not reference measurement and we cannot do distance estimation
-    if not 'people' in classes or not wharf:
+    if not 'People' in classes or not wharf:
         distance_check = False
 
     distance_estimations = []
@@ -297,29 +182,29 @@ def update_tracks(tracker, im0, width, height, ignored_classes, suspended_thresh
         max_people_height = -1.0
         i = 0
         while i < len(classes):
-            if classes[i] == 'people' and heights[i] > max_people_height:
+            if classes[i] == 'People' and heights[i] > max_people_height:
                 max_people_height = heights[i]
             i+=1
         first_object_distance = human_height_coefficient / max_people_height
-        first_objects = {cls: -1.0 for cls in classes if not cls in ['people', 'human carrier', 'forklift']}
+        first_objects = {cls: -1.0 for cls in classes if not cls in ['People', 'Human Carrier', 'Forklift']}
         for i, cls in enumerate(classes):
-            if not cls in ['people', 'human carrier', 'forklift']:
+            if not cls in ['People', 'Human Carrier', 'Forklift']:
                 first_objects[cls] = max(first_objects[cls], areas[i])
         for i, cls in enumerate(classes):
-            if not cls in ['people', 'human carrier', 'forklift']:
+            if not cls in ['People', 'Human Carrier', 'Forklift']:
                 reference_area = first_objects[cls]
                 reference_distance = first_object_distance
                 object_area = areas[i]
                 object_distance = np.sqrt(np.square(reference_distance) * reference_area / object_area)
                 distance_estimations.append(object_distance)
-            elif cls == 'people':
+            elif cls == 'People':
                 object_distance = human_height_coefficient / heights[i]
                 distance_estimations.append(object_distance)
-            elif cls == 'human carrier':
+            elif cls == 'Human Carrier':
                 object_distance = human_carrier_height_coefficient / heights[i]
                 distance_estimations.append(object_distance)
                 # print(object_distance, heights[i])
-            elif cls == 'forklift':
+            elif cls == 'Forklift':
                 object_distance = forklift_height_coefficient / heights[i]
                 distance_estimations.append(object_distance)
             #far_check[i] = object_distance < max_distances[cls]
@@ -331,7 +216,7 @@ def update_tracks(tracker, im0, width, height, ignored_classes, suspended_thresh
                     continue
                 # check whether it is in a forklift or a human carrier
                 for j, box_j in enumerate(boxes):
-                    if classes[j] in ['forklift', 'human carrier'] and classes[i] == 'people':
+                    if classes[j] in ['Forklift', 'Human Carrier'] and classes[i] == 'People':
                         p1 = (box_i[0] , box_i[1] )
                         p2 = (box_i[0] , box_i[1]+box_i[3] )
                         p3 = (box_i[0] + box_i[2] , box_i[1] )
@@ -339,7 +224,7 @@ def update_tracks(tracker, im0, width, height, ignored_classes, suspended_thresh
                         inside_bbox = is_inside(p1, box_j) and is_inside(p2, box_j) and is_inside(p3, box_j) and is_inside(p4, box_j)
                         if inside_bbox:
                             distance_estimations[i] = distance_estimations[j]
-                if distance_estimations[i] > max_distances[classes[i]] or (classes[i] != 'people' and (box_i[3] * box_i[2]) / (height * width) < 0.0025):
+                if distance_estimations[i] > max_distances[classes[i]] or (classes[i] != 'People' and (box_i[3] * box_i[2]) / (height * width) < 0.0025):
                     classes[i] = 'far object'
             except:
                 continue
@@ -353,7 +238,7 @@ def update_tracks(tracker, im0, width, height, ignored_classes, suspended_thresh
             xyxy = xywh2xyxy(box)
             original_label = f'{detection} #{track_id}'
             label = f'{original_label} {cur_distance} CM' if distance_check else original_label
-            #plot_one_box(xyxy, im0, label=label,color=get_color_for(original_label), line_thickness=3)
+            # plot_one_box(xyxy, im0, label=label,color=get_color_for(original_label), line_thickness=3)
     return boxes, classes, distance_estimations,ids
 
 def get_color_for(class_num):
@@ -378,7 +263,7 @@ def get_color_for(class_num):
     return rgb
 
 def get_all_detections_yolov5(vid_path, engine, budget):
-    print('Detection starts...')
+    print('Detection YOLOv5 starts...')
     s_time = time.time()
     imgs_array = []
     dets = []
@@ -415,6 +300,25 @@ def get_all_detections_yolov5(vid_path, engine, budget):
     print(f'Detection is done for {frames} frames in {(e_time - s_time)} seconds!')
     return dets, height, width, fps 
 
+def get_all_detections_yolor(vid_path, dataset, engine, budget):
+    print('Detection YOLOR starts...')
+    s_time = time.time()
+    imgs_array = []
+    dets = []
+    cap = cv2.VideoCapture(vid_path)
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    frames = frames if budget == -1 else min(frames, int(fps*60*budget))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    total_count = 0
+    batch_size = constants.DETECTION_BATCH_SIZE
+    dets = engine.inference(dataset)
+    cap.release()
+    e_time = time.time()
+    print(f'Detection is done for {frames} frames in {(e_time - s_time)} seconds!')
+    return dets, height, width, fps 
+
 def detect(opt):
     global inf_1, inf_2, inf_3, inf_4
     t0 = time_synchronized()
@@ -436,9 +340,10 @@ def detect(opt):
         "cosine", max_cosine_distance, nn_budget)
     
     # load yolov5 model here
-    yolov5_engine = Yolov5_IV() if constants.USE_IV_MODEL else Yolov5()
+      
+    engine = Yolor() if constants.USE_YOLOR_MODEL else Yolov5_IV() if constants.USE_IV_MODEL else Yolov5()
     global names
-    names = yolov5_engine.get_names()
+    names = engine.get_names()
 
     # initialize tracker
     tracker = Tracker(metric)
@@ -452,17 +357,24 @@ def detect(opt):
 
     # Initialize
     set_logging()
-    device = select_device('')
+    # device = select_device('')
 
     # Set Dataloader
     vid_path, vid_writer = None, None
+    dataset0, all_detections = None, None
+    height, width, fps = 0, 0, 0
+    if constants.USE_YOLOR_MODEL:
+        dataset0 = LoadImages(source, img_size=imgsz, auto_size=64)
+        all_detections, height, width, fps = get_all_detections_yolor(source, dataset0, engine, opt.budget)
+    else:
+        all_detections, height, width, fps = get_all_detections_yolov5(source, engine, opt.budget)
+
     dataset = LoadImages(source, img_size=imgsz)
-    all_detections, height, width, fps = get_all_detections_yolov5(source, yolov5_engine, opt.budget)
     frame_count = 0
     distance_tracker = None
     calibrated_frames = 0
     print('Safety zone detection starts...')
-    for p, im0, vid_cap in dataset:
+    for p, _, im0, vid_cap in dataset:
         if type(im0) == type(None):
             continue
         if frame_count == len(all_detections):
@@ -476,7 +388,7 @@ def detect(opt):
                 distance_tracker.clear_calibration_count()
             calib_bboxes = []
             for bbox in all_detections[frame_count]:
-                if bbox[-1] == names.index('people'): 
+                if bbox[-1] == names.index('People'): 
                     calib_bboxes.append(bbox.detach().cpu())
             if len(calib_bboxes) > 0:
                 calibrated_frames += 1
@@ -492,7 +404,9 @@ def detect(opt):
 
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # img.jpg
-
+            print(len(det))
+            bboxes = []
+            classes = []
             if len(det):
                 c3 = -1
                 # Transform bboxes from tlbr to tlwh
@@ -527,11 +441,12 @@ def detect(opt):
                 #print("length of ids {}".format(len(ids)))
                 c4 = time.time()
                 inf_3 += (c4-c3)
-            # update distance tracker
-            distance_tracker.calculate_distance(bboxes, classes, distance_estimations, im0, frame_count,ids)
-            # Print time (inference + NMS)
-            c5 = time.time()
-            inf_4 += (c5-c4)
+
+                # update distance tracker
+                distance_tracker.calculate_distance(bboxes, classes, distance_estimations, im0, frame_count,ids)
+                # Print time (inference + NMS)
+                c5 = time.time()
+                inf_4 += (c5-c4)
 
             # Save results (image with detections)
             if dataset.mode == 'image':

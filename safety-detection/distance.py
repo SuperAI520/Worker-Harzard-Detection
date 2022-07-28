@@ -111,12 +111,12 @@ class DistanceTracker:
 
     def preprocess_bboxes(self, boxes, classes):
         for i in range(len(boxes)):
-            if classes[i] in ['suspended lean object', 'people', 'chain'] + self.ignored_classes:
+            if classes[i] in ['Suspended Lean Object', 'People', 'chain'] + self.ignored_classes:
                 continue
             x, y, w, h = boxes[i]
             if y <= self.suspended_threshold:
-                classes[i] = 'suspended lean object'
-        if not 'suspended lean object' in classes:
+                classes[i] = 'Suspended Lean Object'
+        if not 'Suspended Lean Object' in classes:
             for i, cls in enumerate(classes):
                 if cls == 'chain' and not 'chain' in self.ignored_classes:
                     x, y, w, h = boxes[i]
@@ -125,16 +125,16 @@ class DistanceTracker:
                     if y <= self.suspended_threshold:
                         not_inside = True
                         for i, box in enumerate(boxes):
-                            if classes[i] != 'people':
+                            if classes[i] != 'People':
                                 if self.is_inside(bottom1, box) or self.is_inside(bottom2, box):
                                     not_inside = False
                         if not_inside:
-                            classes[i] = 'suspended lean object'
+                            classes[i] = 'Suspended Lean Object'
 
     def find_transformed_centers(self, boxes, classes):
         centers = []
         for i in range(len(boxes)):
-            if not classes[i] == 'suspended lean object':
+            if not classes[i] == 'Suspended Lean Object':
                 centers.append(None)
                 continue
             center = (boxes[i][0] + boxes[i][2]/2, boxes[i][1] + boxes[i][3]/2)
@@ -165,7 +165,7 @@ class DistanceTracker:
             # print('Distance', len(boxes))
             if not self.wharf:
                 roi_edge= self.edge_points
-                #print(roi_edge)
+                # print(roi_edge)
                 img,self.all_violations=plot.calculate_edge_to_person(roi_edge,img,boxes, classes,count,self.all_violations,ids,self.filename,self.fps)
                 #print(self.all_violations)
                 # Show/write image and videos

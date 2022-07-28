@@ -58,7 +58,7 @@ if __name__== "__main__":
                     
     values = parser.parse_args()
 
-    cv2.namedWindow("image")
+    cv2.namedWindow("image", cv2.WINDOW_NORMAL)
     cv2.setMouseCallback("image", get_mouse_points)
     np.random.seed(42)
     
