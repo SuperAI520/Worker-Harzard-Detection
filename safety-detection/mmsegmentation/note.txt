@@ -1,0 +1,11 @@
+
+
+
+python demo/video_demo.py demo/2.avi configs/pspnet/pspnet_r50-d8_512x512_80k_workspace.py pspnet_r50-d8_512x512_80k_workspace/pspnet_r50_workspace_89.1.pth --device cuda:0 --output-file 2_vid.avi --palette workspace
+
+python demo/image_demo.py demo/1.jpg configs/pspnet/pspnet_r50-d8_512x512_80k_workspace.py pspnet_r50-d8_512x512_80k_workspace/pspnet_r50_workspace_89.1.pth --device cuda:0 --out-file 1_res.jpg --palette workspace
+
+
+python tools/train.py configs/pspnet/pspnet_r50-d8_512x512_80k_workspace.py --work-dir work_dirs/pspnet_r50-d8_512x512_80k_workspace/ --deterministic
+
+python tools/test.py configs/pspnet/pspnet_r50-d8_512x512_80k_workspace.py work_dirs/pspnet_r50-d8_512x512_80k_workspace/pspnet_r50_workspace_89.1.pth --show-dir workspace_results
