@@ -5,6 +5,7 @@ import constants
 import os.path as osp
 import time
 import requests
+import math
 # Function to draw Bird Eye View for region of interest(ROI). Red, Yellow, Green points represents risk to human. 
 # Red: High Risk
 # Yellow: Low Risk
@@ -17,7 +18,7 @@ text_thickness = 2
 line_thickness = 3
 db_push=True
 db_freq_frames=20
-viol_thresh_fl_fh=1.75
+viol_thresh_fl_fh=0.9
 def bird_eye_view(frame, pairs, bottom_points, scale_w, scale_h):
     h = frame.shape[0]
     w = frame.shape[1]
@@ -158,6 +159,37 @@ def push_alert(frame_id,fps,vessel_area,viol_cat,viol,folder_timestamp,vid_save_
     except:
         print("Issue at pushing data to db")
         return False
+
+def point_on_line(a, b, p):
+    ap = p - a
+    ab = b - a
+    result = a + np.dot(ap, ab) / np.dot(ab, ab) * ab
+    return result
+
+def get_min_distance(p0, p1, p2, frame):
+    projected = point_on_line(p1, p2, p0)
+    x1, x2, x0 = p1[0], p2[0], projected[0]
+    y1, y2, y0 = p1[1], p2[1], projected[1]
+    shape = frame.shape
+
+    if (x1==x2 and (x1 == shape[1] - 1 or x1 == 0)) or (y1==y2 and (y1 == shape[0] - 1 or y1 == 0)) :
+        distance = shape[0]
+        return distance
+
+    # slope = (y2 - y1) / (x2 - x1)
+    # projected_on = (y0 - y1) == slope * (x0 - x1)
+    projected_between = (min(x1, x2) <= x0 <= max(x1, x2)) and (min(y1, y2) <= y0 <= max(y1, y2))
+    # on_and_between = (projected_on and projected_between)
+
+    if projected_between:
+        distance=np.linalg.norm(np.cross(p2-p1,p0-p1)/np.linalg.norm(p2-p1))/100
+    else:
+        eDistance1 = np.linalg.norm(p0-p1) / 100
+        eDistance2 = np.linalg.norm(p0-p2) / 100            
+        distance = min(eDistance1, eDistance2)
+
+    return distance
+    
 def calculate_edge_to_person(roi_edge,frame, boxes,classes,frame_id,all_violations,ids,output_dir,fps):
     #roi_pts = np.array(self.reference_points, np.int32)\
     green = (0, 255, 0)
@@ -170,16 +202,31 @@ def calculate_edge_to_person(roi_edge,frame, boxes,classes,frame_id,all_violatio
     risk_count = 0
     vessel_area="hatch"
     #roi_edge = [self.reference_points[0],self.reference_points[1]]
+    cv2.drawContours(frame, roi_edge, -1, (255, 0, 0), 2)
     for i in range(len(boxes)):
         if classes[i]=='People':
             #i, j, dist, danger = pair
             #xi, yi, wi, hi = boxes[i]
             xj, yj, wj, hj = boxes[i]
-            p3=np.array([xj, yj])
-            p1=np.array(list(roi_edge[0]))
-            p2=np.array(list(roi_edge[1]))
-            distance=np.linalg.norm(np.cross(p2-p1,p3-p1)/np.linalg.norm(p2-p1))/100
-            #print(round(float(distance),2))
+            p0=np.array([xj + wj / 2, yj + hj/2])
+            # p1=np.array(list(roi_edge[0]))
+            # p2=np.array(list(roi_edge[1]))
+
+            distance = frame.shape[0]
+            for edge_pts in roi_edge:
+                for k in range(len(edge_pts)):
+                    if k + 1 == len(edge_pts):
+                        distance = get_min_distance(p0, edge_pts[k][0], edge_pts[0][0], frame)
+                    else:
+                        distance = get_min_distance(p0, edge_pts[k][0], edge_pts[k+1][0], frame)
+
+                    if round(float(distance),2)<viol_thresh_fl_fh:
+                        break
+
+                if round(float(distance),2)<viol_thresh_fl_fh:
+                        break
+            # distance=np.linalg.norm(np.cross(p2-p1,p3-p1)/np.linalg.norm(p2-p1))/100
+
             obj_id=ids[i]
             if obj_id not in all_violations.keys():
                 violation_dict = {'first_frame_id':frame_id,'sload_last_pushed_frame_id':0,'sload_prox':False,'fall_fh':False,'fall_fh__last_pushed_frame_id':0}

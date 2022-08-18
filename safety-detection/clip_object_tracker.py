@@ -4,6 +4,8 @@ import argparse
 import time
 from pathlib import Path
 from turtle import distance
+import glob
+import os
 
 import clip
 import time
@@ -17,11 +19,11 @@ from deep_sort.detection import Detection
 from deep_sort.tracker import Tracker
 from tools import generate_clip_detections as gdet
 
-
+from segment import DetectWorkspace
 from distance import DistanceTracker
 import constants
 from utils_.yolor import Yolor
-from utils_.yolov5 import Yolov5, Yolov5_IV
+# from utils_.yolov5 import Yolov5, Yolov5_IV
 if constants.USE_YOLOR_MODEL:
     from yolor.utils.datasets import LoadImages
     from yolor.utils.general import set_logging, increment_path
@@ -319,6 +321,16 @@ def get_all_detections_yolor(vid_path, dataset, engine, budget):
     print(f'Detection is done for {frames} frames in {(e_time - s_time)} seconds!')
     return dets, height, width, fps 
 
+def get_detection_frame_yolor(frame, engine):
+    s_time = time.time()
+    imgs_array = []
+    imgsz = opt.img_size
+    
+    det = engine.inference_frame(frame, img_size = imgsz, auto_size = 64)
+    e_time = time.time()
+    # print(f'Detection is done for frames in {(e_time - s_time)} seconds!')
+    return det   
+
 def detect(opt):
     global inf_1, inf_2, inf_3, inf_4
     t0 = time_synchronized()
@@ -344,7 +356,7 @@ def detect(opt):
     engine = Yolor() if constants.USE_YOLOR_MODEL else Yolov5_IV() if constants.USE_IV_MODEL else Yolov5()
     global names
     names = engine.get_names()
-
+    workspace_detector = DetectWorkspace()
     # initialize tracker
     tracker = Tracker(metric)
 
@@ -358,7 +370,7 @@ def detect(opt):
     # Initialize
     set_logging()
     # device = select_device('')
-
+    """
     # Set Dataloader
     vid_path, vid_writer = None, None
     dataset0, all_detections = None, None
@@ -379,9 +391,12 @@ def detect(opt):
             continue
         if frame_count == len(all_detections):
             break
+
+        if frame_count == 0:
+            workspaces, height_edges = detect_workspace(img0)
         c1 = time.time()
         if frame_count == 0:
-            distance_tracker = DistanceTracker(im0, opt.source, height, width, fps, ignored_classes, opt.danger_zone_width_threshold, opt.danger_zone_height_threshold, opt.wharf, opt.angle, save_dir)
+            distance_tracker = DistanceTracker(im0, opt.source, height, width, fps, ignored_classes, opt.danger_zone_width_threshold, opt.danger_zone_height_threshold, workspaces, height_edges, opt.wharf, opt.angle, save_dir)
             suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
         if calibrated_frames < 10:
             if calibrated_frames == 0:
@@ -470,7 +485,125 @@ def detect(opt):
     print(f"Results saved to {save_dir}")
     elapsed_time = time.time() - t0
     print(f'Done. ({elapsed_time:.3f}s, fps: {frame_count/elapsed_time:.3f})', inf_1, inf_2, inf_3, inf_4)
+    """           
 
+    cap = cv2.VideoCapture(source)
+    vid_path, vid_writer = None, None
+    if not cap.isOpened():
+        print("Cannot open camera")
+        exit()
+
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    frames = frames if opt.budget == -1 else min(frames, int(fps*60*opt.budget))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    
+    frame_count = 0
+    distance_tracker = None
+    calibrated_frames = 0
+    
+    workspaces, height_edges = [], []
+    print('Safety zone detection starts...')
+    # cv2.namedWindow("output", cv2.WINDOW_NORMAL)  
+    while True:
+        # Capture frame-by-frame
+        ret, frame = cap.read()
+        # if frame is read correctly ret is True
+        if not ret:
+            print("Can't receive frame (stream end?). Exiting ...")
+            break
+
+        c0 = time.time()
+        if frame_count == 0:
+            distance_tracker = DistanceTracker(frame, opt.source, height, width, fps, ignored_classes, opt.danger_zone_width_threshold, opt.danger_zone_height_threshold, workspaces, height_edges, opt.wharf, opt.angle, save_dir)
+
+        if (frame_count / fps) % 60 == 0:
+            workspaces, height_edges = workspace_detector.detect_workspace(frame)
+            distance_tracker.update_workarea_edgepoints(workspaces[0], height_edges)
+            distance_tracker.calibrate_reference_area('')
+            suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
+
+        detection = get_detection_frame_yolor(frame, engine)
+        c1 = time.time()
+        inf_1 = int((c1-c0) *1000)
+
+        if calibrated_frames < 10:
+            if calibrated_frames == 0:
+                distance_tracker.clear_calibration_count()
+            calib_bboxes = []
+            for bbox in detection:
+                if bbox[-1] == names.index('People'): 
+                    calib_bboxes.append(bbox.detach().cpu())
+            if len(calib_bboxes) > 0:
+                calibrated_frames += 1
+                distance_tracker.calibrate_lengths(calib_bboxes)
+        else:
+            calibrated_frames = (calibrated_frames + 1) % 30
+
+        pred = detection.unsqueeze(0)
+        c2 = time.time()
+        inf_2 = int((c2-c1) *1000)
+        for i, det in enumerate(pred): # detections per image
+            bboxes = []
+            classes = []
+            if len(det):
+                c3 = -1
+                # Transform bboxes from tlbr to tlwh
+                trans_bboxes = det[:, :4].clone()
+                trans_bboxes[:, 2:] -= trans_bboxes[:, :2]
+                bboxes = trans_bboxes[:, :4].cpu()
+                confs = det[:, 4]
+                class_nums = det[:, -1].cpu()
+                classes = class_nums
+
+                # encode yolo detections and feed to tracker
+                features = encoder(frame, bboxes)
+                detections = [Detection(bbox, conf, class_num, feature) for bbox, conf, class_num, feature in zip(
+                    bboxes, confs, classes, features)]
+
+                # run non-maxima supression
+                boxs = np.array([d.tlwh for d in detections])
+                scores = np.array([d.confidence for d in detections])
+                class_nums = np.array([d.class_num for d in detections])
+                indices = preprocessing.non_max_suppression(
+                    boxs, class_nums, nms_max_overlap, scores)
+                detections = [detections[i] for i in indices]
+                c3 = time.time()
+                inf_3 = int((c3-c2) *1000)
+                
+                # Call the tracker
+                tracker.predict()
+                tracker.update(detections)
+
+                # update tracks
+                bboxes, classes, distance_estimations,ids = update_tracks(tracker, frame, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, opt.angle, opt.distance_check, opt.wharf, not hasattr(distance_tracker, 'distance_w'), opt.no_nested)
+                #print("length of bboxes {}".format(bboxes))
+                #print("length of ids {}".format(len(ids)))
+                c4 = time.time()
+                inf_4 = int((c4-c3) *1000)
+
+                # update distance tracker
+                distance_tracker.calculate_distance(bboxes, classes, distance_estimations, frame, frame_count,ids)
+                # Print time (inference + NMS)
+                c5 = time.time()
+                inf_5 = int((c5-c4) *1000)
+            
+        frame_count = frame_count+1
+        if frame_count == frames:
+            break
+
+        elapsed_time = int((time.time()-c0)*1000)
+        print(f'\t\t\t elapsed time {elapsed_time}: {inf_1}, {inf_2}, {inf_3}, {inf_4}, {inf_5}')
+        # Display the resulting frame
+        # cv2.imshow("output", frame)
+        
+        if cv2.waitKey(1) == ord('q'):
+            break
+
+    # When everything done, release the capture
+    cap.release()
+    cv2.destroyAllWindows()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

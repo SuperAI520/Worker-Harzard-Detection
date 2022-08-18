@@ -11,7 +11,7 @@ from mmcv.runner.hooks.logger.wandb import WandbLoggerHook
 from mmseg.core import DistEvalHook, EvalHook
 
 
-@HOOKS.register_module()
+@HOOKS.register_module(name='MMSegWandbHook', force=True)
 class MMSegWandbHook(WandbLoggerHook):
     """Enhanced Wandb logger hook for MMSegmentation.
 

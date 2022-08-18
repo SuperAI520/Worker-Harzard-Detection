@@ -11,14 +11,16 @@ import torch
 import torchvision.ops.boxes as bops
 
 class DistanceTracker:
-    def __init__(self, frame, source, height, width, fps, ignored_classes, danger_zone_width_threshold, danger_zone_height_threshold, wharf,angle, output_dir):
+    def __init__(self, frame, source, height, width, fps, ignored_classes, danger_zone_width_threshold, danger_zone_height_threshold, work_area, height_edges, wharf,angle, output_dir):
         self.output_dir = output_dir
         # Get video height, width and fps
         self.height = height
         self.width = width
         self.angle = angle
         self.filename=source.split('/')[-1].split('.')[0]
-        self.edge_points = constants.EDGE_AREA_DICT[source.split('/')[-1]]
+        # self.edge_points = constants.EDGE_AREA_DICT[source.split('/')[-1]]
+        self.edge_points = height_edges
+        self.reference_points = work_area
         self.calibrate_reference_area(source.split('/')[-1])
         self.scale_w, self.scale_h = utills.get_scale(self.width, self.height)
 
@@ -33,12 +35,17 @@ class DistanceTracker:
         self.all_violations=dict()
         self.fps=fps
 
+    def update_workarea_edgepoints(self, work_area, edge_points):
+        self.edge_points = edge_points
+        self.reference_points = work_area
 
     def get_suspended_threshold(self):
         return self.suspended_threshold_hatch, self.suspended_threshold_wharf, self.suspended_threshold_wharf_side
 
     def calibrate_reference_area(self, video_file):
-        self.reference_points = constants.REFERENCE_AREA_DICT[video_file] #get_keypoints(frame)
+        # self.reference_points = constants.REFERENCE_AREA_DICT[video_file] #get_keypoints(frame)
+        if len(self.reference_points) == 0:
+            return
         print(self.reference_points)
         src = np.float32(np.array(self.reference_points))
         dst = np.float32([[0, self.height], [self.width, self.height], [self.width, 0], [0, 0]])
