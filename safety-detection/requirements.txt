@@ -8,8 +8,6 @@ Pillow>=7.1.2
 PyYAML>=5.3.1
 requests>=2.23.0
 scipy>=1.5
-torch>=1.7.0
-torchvision>=0.8.1
 tqdm>=4.41.0
 
 # Logging -------------------------------------
@@ -20,6 +18,15 @@ tensorboard>=2.4.1
 pandas>=1.1.4
 seaborn>=0.11.0
 
+# if for not docker, these have to be unlocked.
+#torch>=1.7.0
+#torchvision>=0.8.1
+
+fastai==2.7.9
+openmim==0.2.1
+pycocotools==2.0.4
+Shapely==1.8.4
+
 # clip
-ftfy==6.0.3
-regex==2.5.86
+ftfy==6.1.1
+regex==2022.8.17
