@@ -256,7 +256,7 @@ def get_scale(W, H):
     
     return float(dis_w/W),float(dis_h/H)
 
-def get_distances(boxes, reference_points, perspective_transform, inverse_perspective_transform, classes, distance_w, distance_h, w, h, danger_zone_width_threshold, danger_zone_height_threshold, average_human_height, wharf):
+def get_distances(boxes, reference_points, perspective_transform, inverse_perspective_transform, classes, old_classes, distance_w, distance_h, w, h, danger_zone_width_threshold, danger_zone_height_threshold, average_human_height, wharf):
     danger_zones = []
     danger_zone_checks = []
     roi_middle_y = (reference_points[0][1] + reference_points[1][1] + reference_points[2][1] + reference_points[3][1]) / 4
@@ -282,7 +282,7 @@ def get_distances(boxes, reference_points, perspective_transform, inverse_perspe
             continue
         danger_zone = None
         if height_from_ground[i] >= danger_zone_height_threshold:
-            danger_zone = calculate_danger_zone_coordinates(boxes[i], bottom_points[i], distance_w, distance_h, w, h, danger_zone_width_threshold, wharf)
+            danger_zone = calculate_danger_zone_coordinates(old_classes[i], boxes[i], bottom_points[i], reference_points, distance_w, distance_h, w, h, danger_zone_width_threshold, wharf)
             danger_zones.append(danger_zone)
         for j in range(len(bottom_points)):
             if classes[j] != 'People':
@@ -291,13 +291,32 @@ def get_distances(boxes, reference_points, perspective_transform, inverse_perspe
             danger_zone_checks.append((i, j, None, in_danger)) 
     return danger_zone_checks, bottom_points, danger_zones, height_from_ground
 
-def calculate_danger_zone_coordinates(box, center_pt, distance_w, distance_h, w, h, width_threshold, wharf):
+def calculate_danger_zone_coordinates(old_class, box, center_pt, reference_points, distance_w, distance_h, w, h, width_threshold, wharf):
+    # box_w, box_h = box[2:]
+    # box_diag = UNIT_LENGTH * np.sqrt((box_w / distance_w) ** 2 + (box_h / distance_h) ** 2)
+    # transformed_w = box_w * DANGER_ZONE_DIAG / box_diag
+    # if wharf:
+    #     transformed_w = min(transformed_w, width_threshold)
+    # transformed_h = box_h * DANGER_ZONE_DIAG / box_diag
+    
     box_w, box_h = box[2:]
-    box_diag = UNIT_LENGTH * np.sqrt((box_w / distance_w) ** 2 + (box_h / distance_h) ** 2)
-    transformed_w = box_w * DANGER_ZONE_DIAG / box_diag
-    if wharf:
-        transformed_w = min(transformed_w, width_threshold)
-    transformed_h = box_h * DANGER_ZONE_DIAG / box_diag
+    box_diag = np.sqrt(box_w ** 2 + box_h ** 2)
+
+    distance1 = np.linalg.norm(np.cross(reference_points[1]-reference_points[0],reference_points[2]-reference_points[0])/np.linalg.norm(reference_points[1]-reference_points[0]))
+    distance2 = np.linalg.norm(np.cross(reference_points[1]-reference_points[0],reference_points[3]-reference_points[0])/np.linalg.norm(reference_points[1]-reference_points[0]))
+    
+    min_height = min(distance1, distance2)
+
+    # transform_rate = h / box_diag
+    transformed_w = box_w
+    if box_diag > min_height:
+        if old_class in ['Container', 'Small Pipe', 'Large Pipe', 'Suspended Lean Object', 'Wooden Board', 'Iron Rake', 'Wood']:
+            transformed_h = np.sqrt(h ** 2 - transformed_w ** 2)
+        else:
+            transformed_h = np.sqrt((h / 2) ** 2 - transformed_w ** 2)
+    else:
+        transformed_h = (h / min_height) * box_h
+
     left = max(0, center_pt[0] - transformed_w/2)
     right = min(w, center_pt[0] + transformed_w/2)
     top = max(0, center_pt[1] - transformed_h/2)

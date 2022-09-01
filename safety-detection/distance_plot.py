@@ -125,7 +125,7 @@ def draw_danger_zones(img, reversed_danger_zones):
 
     return img
 def push_alert(frame_id,fps,vessel_area,viol_cat,viol,folder_timestamp,vid_save_path,s_img_name) -> bool:
-    
+    return False
     db_push_api = "http://jp.groundup.ai:5566/db/push_violations/v1/"
     # secrets for api access
     APIKEY = "NDI2NzRmMDM2Y2U1ZGZiNTg1M2YxMDk0"
@@ -202,7 +202,6 @@ def calculate_edge_to_person(roi_edge,frame, boxes,classes,frame_id,all_violatio
     risk_count = 0
     vessel_area="hatch"
     #roi_edge = [self.reference_points[0],self.reference_points[1]]
-    cv2.drawContours(frame, roi_edge, -1, (255, 0, 0), 2)
     for i in range(len(boxes)):
         if classes[i]=='People':
             #i, j, dist, danger = pair

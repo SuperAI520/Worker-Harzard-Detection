@@ -39,7 +39,7 @@ else:
 classes = []
 
 names = []
-inf_1, inf_2, inf_3, inf_4 = 0, 0, 0, 0 
+inf_1, inf_2, inf_3, inf_4, inf_5 = 0, 0, 0, 0, 0
 
 def xyxy2xywh(xyxy):
     x = xyxy[0]
@@ -61,7 +61,7 @@ def is_inside(point, box):
 
 def update_tracks(tracker, im0, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, angle, distance_check, wharf, no_action, no_nested):
     if no_action:
-        return [], [], [],[]
+        return [], [], [],[],[]
     
     max_distances = {
         'Forklift': constants.MAX_DISTANCE_FOR_FORKLIFT,
@@ -77,6 +77,7 @@ def update_tracks(tracker, im0, width, height, ignored_classes, suspended_thresh
 
     boxes = []
     classes = []
+    old_classes = []
     detections = []
     ids = []
     heights = []
@@ -92,6 +93,7 @@ def update_tracks(tracker, im0, width, height, ignored_classes, suspended_thresh
             continue
         boxes.append(xywh)
         classes.append(class_name)
+        old_classes.append(class_name)
         detections.append(class_name)
         ids.append(track.track_id)
 
@@ -241,7 +243,7 @@ def update_tracks(tracker, im0, width, height, ignored_classes, suspended_thresh
             original_label = f'{detection} #{track_id}'
             label = f'{original_label} {cur_distance} CM' if distance_check else original_label
             # plot_one_box(xyxy, im0, label=label,color=get_color_for(original_label), line_thickness=3)
-    return boxes, classes, distance_estimations,ids
+    return boxes, classes, old_classes, distance_estimations,ids
 
 def get_color_for(class_num):
     colors = [
@@ -332,7 +334,7 @@ def get_detection_frame_yolor(frame, engine):
     return det   
 
 def detect(opt):
-    global inf_1, inf_2, inf_3, inf_4
+    global inf_1, inf_2, inf_3, inf_4, inf_5
     t0 = time_synchronized()
     ignored_classes = opt.ignored_classes
     for idx in range(len(ignored_classes)):
@@ -524,6 +526,8 @@ def detect(opt):
             distance_tracker.calibrate_reference_area('')
             suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
 
+        cv2.drawContours(frame, height_edges, -1, (0, 0, 255), 5)
+
         detection = get_detection_frame_yolor(frame, engine)
         c1 = time.time()
         inf_1 = int((c1-c0) *1000)
@@ -577,14 +581,14 @@ def detect(opt):
                 tracker.update(detections)
 
                 # update tracks
-                bboxes, classes, distance_estimations,ids = update_tracks(tracker, frame, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, opt.angle, opt.distance_check, opt.wharf, not hasattr(distance_tracker, 'distance_w'), opt.no_nested)
+                bboxes, classes, old_classes, distance_estimations,ids = update_tracks(tracker, frame, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, opt.angle, opt.distance_check, opt.wharf, not hasattr(distance_tracker, 'distance_w'), opt.no_nested)
                 #print("length of bboxes {}".format(bboxes))
                 #print("length of ids {}".format(len(ids)))
                 c4 = time.time()
                 inf_4 = int((c4-c3) *1000)
 
                 # update distance tracker
-                distance_tracker.calculate_distance(bboxes, classes, distance_estimations, frame, frame_count,ids)
+                distance_tracker.calculate_distance(bboxes, classes, old_classes, distance_estimations, frame, frame_count,ids)
                 # Print time (inference + NMS)
                 c5 = time.time()
                 inf_5 = int((c5-c4) *1000)
