@@ -207,7 +207,7 @@ def calculate_edge_to_person(roi_edge,frame, boxes,classes,frame_id,all_violatio
             #i, j, dist, danger = pair
             #xi, yi, wi, hi = boxes[i]
             xj, yj, wj, hj = boxes[i]
-            p0=np.array([xj + wj / 2, yj + hj/2])
+            p0=np.array([xj + wj / 2, yj + hj])
             # p1=np.array(list(roi_edge[0]))
             # p2=np.array(list(roi_edge[1]))
 
