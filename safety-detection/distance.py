@@ -173,7 +173,7 @@ class DistanceTracker:
             if not self.wharf:
                 roi_edge= self.edge_points
                 # print(roi_edge)
-                img,self.all_violations=plot.calculate_edge_to_person(roi_edge,img,boxes, classes,count,self.all_violations,ids,self.filename,self.fps)
+                img,self.all_violations=plot.calculate_edge_to_person(roi_edge,img, frame.shape, boxes, classes,count,self.all_violations,ids,self.filename,self.fps)
                 #print(self.all_violations)
                 # Show/write image and videos
         else:

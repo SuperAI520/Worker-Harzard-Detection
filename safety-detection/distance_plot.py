@@ -166,11 +166,10 @@ def point_on_line(a, b, p):
     result = a + np.dot(ap, ab) / np.dot(ab, ab) * ab
     return result
 
-def get_min_distance(p0, p1, p2, frame):
+def get_min_distance(p0, p1, p2, shape):
     projected = point_on_line(p1, p2, p0)
     x1, x2, x0 = p1[0], p2[0], projected[0]
     y1, y2, y0 = p1[1], p2[1], projected[1]
-    shape = frame.shape
 
     if (x1==x2 and (x1 == shape[1] - 1 or x1 == 0)) or (y1==y2 and (y1 == shape[0] - 1 or y1 == 0)) :
         distance = shape[0]
@@ -190,7 +189,7 @@ def get_min_distance(p0, p1, p2, frame):
 
     return distance
     
-def calculate_edge_to_person(roi_edge,frame, boxes,classes,frame_id,all_violations,ids,output_dir,fps):
+def calculate_edge_to_person(roi_edge,frame, ori_shape, boxes,classes,frame_id,all_violations,ids,output_dir,fps):
     #roi_pts = np.array(self.reference_points, np.int32)\
     green = (0, 255, 0)
     text_scale = 1.5
@@ -211,13 +210,17 @@ def calculate_edge_to_person(roi_edge,frame, boxes,classes,frame_id,all_violatio
             # p1=np.array(list(roi_edge[0]))
             # p2=np.array(list(roi_edge[1]))
 
-            distance = frame.shape[0]
+            distance = ori_shape[0]
             for edge_pts in roi_edge:
+                inside = cv2.pointPolygonTest(edge_pts, p0, False)
+                if inside < 0:
+                    continue
+                
                 for k in range(len(edge_pts)):
                     if k + 1 == len(edge_pts):
-                        distance = get_min_distance(p0, edge_pts[k][0], edge_pts[0][0], frame)
+                        distance = get_min_distance(p0, edge_pts[k][0], edge_pts[0][0], ori_shape)
                     else:
-                        distance = get_min_distance(p0, edge_pts[k][0], edge_pts[k+1][0], frame)
+                        distance = get_min_distance(p0, edge_pts[k][0], edge_pts[k+1][0], ori_shape)
 
                     if round(float(distance),2)<viol_thresh_fl_fh:
                         break
