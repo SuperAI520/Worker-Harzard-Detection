@@ -35,11 +35,15 @@ class DistanceTracker:
         self.all_violations=dict()
         self.fps=fps
 
-    def update_workarea_edgepoints(self, work_area, edge_points):
-        self.edge_points = edge_points
+    def update_workarea(self, work_area):
         self.reference_points = work_area
 
+    def update_edgepoints(self, edge_points):
+        self.edge_points = edge_points
+
     def get_suspended_threshold(self):
+        if len(self.reference_points) == 0:
+            return 0, 0, 0
         return self.suspended_threshold_hatch, self.suspended_threshold_wharf, self.suspended_threshold_wharf_side
 
     def calibrate_reference_area(self, video_file):
@@ -153,7 +157,7 @@ class DistanceTracker:
             centers.append((x,y))
         return centers
 
-    def calculate_distance(self, boxes, classes, old_classes, distance_estimations, frame, count,ids):
+    def calculate_distance(self, work_area_index, boxes, classes, old_classes, distance_estimations, frame, count,ids):
         # boxes = []
         # classes = []
         #boxes, classes = self.get_bboxes(tracker, names)
@@ -162,7 +166,7 @@ class DistanceTracker:
         roi_pts = np.array(self.reference_points, np.int32)
         cv2.polylines(frame, [roi_pts], True, (70, 70, 70), thickness=10)
         #frame1 = np.copy(frame)
-        if hasattr(self, 'distance_w'):
+        if hasattr(self, 'distance_w') and work_area_index != -1:
             # print('Distance', len(boxes))
             pairs, warped_pts, danger_zones, heights = utills.get_distances(boxes, self.reference_points, self.perspective_transform, self.inverse_perspective_transform, classes, old_classes, self.distance_w, self.distance_h, self.width, self.height, self.danger_zone_width_threshold, self.danger_zone_height_threshold, self.wharf_human_height, self.wharf)
             reversed_pts = utills.get_perspective_transform(warped_pts, self.inverse_perspective_transform)

@@ -12,6 +12,8 @@ import time
 import cv2
 import torch
 import numpy as np
+import math
+import collections 
 
 # deep sort imports
 from deep_sort import preprocessing, nn_matching
@@ -59,8 +61,8 @@ def is_inside(point, box):
         x, y, w, h = box
         return point[0] >= x and point[0] <= x+w and point[1] >= y and point[1] <= y+h
 
-def update_tracks(tracker, im0, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, angle, distance_check, wharf, no_action, no_nested):
-    if no_action:
+def update_tracks(work_area_index, tracker, im0, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, angle, distance_check, wharf, no_action, no_nested):
+    if no_action and work_area_index != -1:
         return [], [], [],[],[]
     
     max_distances = {
@@ -103,6 +105,9 @@ def update_tracks(tracker, im0, width, height, ignored_classes, suspended_thresh
         if classes[i] in ['Container', 'Small Pipe', 'Large Pipe', 'Wooden Board', 'Iron Rake', 'Wood', 'Coil']:
             classes[i] = 'Suspended Lean Object'
 
+        if work_area_index == -1:
+            continue
+            
         if classes[i] in ['Suspended Lean Object', 'People', 'chain'] + ignored_classes:
             continue
         side_limit_check = True
@@ -370,124 +375,7 @@ def detect(opt):
     save_dir.mkdir(parents=True, exist_ok=True)  # make dir
 
     # Initialize
-    set_logging()
-    # device = select_device('')
-    """
-    # Set Dataloader
-    vid_path, vid_writer = None, None
-    dataset0, all_detections = None, None
-    height, width, fps = 0, 0, 0
-    if constants.USE_YOLOR_MODEL:
-        dataset0 = LoadImages(source, img_size=imgsz, auto_size=64)
-        all_detections, height, width, fps = get_all_detections_yolor(source, dataset0, engine, opt.budget)
-    else:
-        all_detections, height, width, fps = get_all_detections_yolov5(source, engine, opt.budget)
-
-    dataset = LoadImages(source, img_size=imgsz)
-    frame_count = 0
-    distance_tracker = None
-    calibrated_frames = 0
-    print('Safety zone detection starts...')
-    for p, _, im0, vid_cap in dataset:
-        if type(im0) == type(None):
-            continue
-        if frame_count == len(all_detections):
-            break
-
-        if frame_count == 0:
-            workspaces, height_edges = detect_workspace(img0)
-        c1 = time.time()
-        if frame_count == 0:
-            distance_tracker = DistanceTracker(im0, opt.source, height, width, fps, ignored_classes, opt.danger_zone_width_threshold, opt.danger_zone_height_threshold, workspaces, height_edges, opt.wharf, opt.angle, save_dir)
-            suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
-        if calibrated_frames < 10:
-            if calibrated_frames == 0:
-                distance_tracker.clear_calibration_count()
-            calib_bboxes = []
-            for bbox in all_detections[frame_count]:
-                if bbox[-1] == names.index('People'): 
-                    calib_bboxes.append(bbox.detach().cpu())
-            if len(calib_bboxes) > 0:
-                calibrated_frames += 1
-                distance_tracker.calibrate_lengths(calib_bboxes)
-        else:
-            calibrated_frames = (calibrated_frames + 1) % 30
-
-        pred = all_detections[frame_count].unsqueeze(0)
-        c2 = time.time()
-        inf_1 += (c2-c1)
-        # Process detections
-        for i, det in enumerate(pred):  # detections per image
-
-            p = Path(p)  # to Path
-            save_path = str(save_dir / p.name)  # img.jpg
-            print(len(det))
-            bboxes = []
-            classes = []
-            if len(det):
-                c3 = -1
-                # Transform bboxes from tlbr to tlwh
-                trans_bboxes = det[:, :4].clone()
-                trans_bboxes[:, 2:] -= trans_bboxes[:, :2]
-                bboxes = trans_bboxes[:, :4].cpu()
-                confs = det[:, 4]
-                class_nums = det[:, -1].cpu()
-                classes = class_nums
-
-                # encode yolo detections and feed to tracker
-                features = encoder(im0, bboxes)
-                detections = [Detection(bbox, conf, class_num, feature) for bbox, conf, class_num, feature in zip(
-                    bboxes, confs, classes, features)]
-
-                # run non-maxima supression
-                boxs = np.array([d.tlwh for d in detections])
-                scores = np.array([d.confidence for d in detections])
-                class_nums = np.array([d.class_num for d in detections])
-                indices = preprocessing.non_max_suppression(
-                    boxs, class_nums, nms_max_overlap, scores)
-                detections = [detections[i] for i in indices]
-                c3 = time.time()
-                inf_2 += (c3-c2)
-                # Call the tracker
-                tracker.predict()
-                tracker.update(detections)
-
-                # update tracks
-                bboxes, classes, distance_estimations,ids = update_tracks(tracker, im0, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, opt.angle, opt.distance_check, opt.wharf, not hasattr(distance_tracker, 'distance_w'), opt.no_nested)
-                #print("length of bboxes {}".format(bboxes))
-                #print("length of ids {}".format(len(ids)))
-                c4 = time.time()
-                inf_3 += (c4-c3)
-
-                # update distance tracker
-                distance_tracker.calculate_distance(bboxes, classes, distance_estimations, im0, frame_count,ids)
-                # Print time (inference + NMS)
-                c5 = time.time()
-                inf_4 += (c5-c4)
-
-            # Save results (image with detections)
-            if dataset.mode == 'image':
-                cv2.imwrite(save_path, im0)
-            else:  # 'video'
-                if vid_path != save_path:  # new video
-                    vid_path = save_path
-                    if isinstance(vid_writer, cv2.VideoWriter):
-                        vid_writer.release()  # release previous video writer
-
-                    fourcc = 'mp4v'  # output video codec
-                    fps = vid_cap.get(cv2.CAP_PROP_FPS)
-                    w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                    h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                    vid_writer = cv2.VideoWriter(
-                        save_path, cv2.VideoWriter_fourcc(*fourcc), fps, (w, h))
-                vid_writer.write(im0)
-
-            frame_count = frame_count+1
-
-    print(f"Results saved to {save_dir}")
-    elapsed_time = time.time() - t0
-    print(f'Done. ({elapsed_time:.3f}s, fps: {frame_count/elapsed_time:.3f})', inf_1, inf_2, inf_3, inf_4)
-    """           
+    set_logging()      
 
     cap = cv2.VideoCapture(source)
     vid_path, vid_writer = None, None
@@ -504,7 +392,13 @@ def detect(opt):
     frame_count = 0
     distance_tracker = None
     calibrated_frames = 0
-    
+
+    work_area_choose_start_flag = 0 # 0: not process 1: ready to detect first cargo detection 2: in process 3: end process
+    ignore_cargo_ids, accumulated_cargo_ids, distances_arr = [], [], []
+    cargos_pos = []
+    work_area_index = -1
+
+    suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = 0, 0, 0
     workspaces, height_edges = [], []
     print('Safety zone detection starts...')
     # cv2.namedWindow("output", cv2.WINDOW_NORMAL)  
@@ -520,11 +414,33 @@ def detect(opt):
         if frame_count == 0:
             distance_tracker = DistanceTracker(frame, opt.source, height, width, fps, ignored_classes, opt.danger_zone_width_threshold, opt.danger_zone_height_threshold, workspaces, height_edges, opt.wharf, opt.angle, save_dir)
 
-        if (frame_count / fps) % 60 == 0:
-            workspaces, height_edges = workspace_detector.detect_workspace(frame)
-            distance_tracker.update_workarea_edgepoints(workspaces[0], height_edges)
-            distance_tracker.calibrate_reference_area('')
-            suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
+        if (frame_count / fps) % 300 == 0 or len(workspaces) == 0:
+            work_area_choose_start_flag = 1
+            distances_arr.clear()
+            cargos_pos.clear()
+            accumulated_cargo_ids.clear()
+            ignore_cargo_ids.clear()
+
+            workspaces, center_points, height_edges = workspace_detector.detect_workspace(frame)
+            if len(workspaces) == 0:
+                frame_count = frame_count+1
+                if frame_count == frames:
+                    break
+                
+                # cv2.imshow("output", frame)
+                if cv2.waitKey(1) == ord('q'):
+                    break
+                continue
+
+            if len(workspaces) == 1:
+                print(f'*********************   only 1 work area')
+                work_area_index = 0
+                work_area_choose_start_flag = 3
+                distance_tracker.update_workarea(workspaces[work_area_index])
+                distance_tracker.calibrate_reference_area('')
+                suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
+
+            distance_tracker.update_edgepoints(height_edges)
 
         cv2.drawContours(frame, height_edges, -1, (0, 0, 255), 5)
 
@@ -532,22 +448,49 @@ def detect(opt):
         c1 = time.time()
         inf_1 = int((c1-c0) *1000)
 
-        if calibrated_frames < 10:
-            if calibrated_frames == 0:
-                distance_tracker.clear_calibration_count()
-            calib_bboxes = []
-            for bbox in detection:
-                if bbox[-1] == names.index('People'): 
-                    calib_bboxes.append(bbox.detach().cpu())
-            if len(calib_bboxes) > 0:
-                calibrated_frames += 1
-                distance_tracker.calibrate_lengths(calib_bboxes)
-        else:
-            calibrated_frames = (calibrated_frames + 1) % 30
+        if work_area_index != -1:
+            if calibrated_frames < 10:
+                if calibrated_frames == 0:
+                    distance_tracker.clear_calibration_count()
+                calib_bboxes = []
+                for bbox in detection:
+                    if bbox[-1] == names.index('People'): 
+                        calib_bboxes.append(bbox.detach().cpu())
+                if len(calib_bboxes) > 0:
+                    calibrated_frames += 1
+                    distance_tracker.calibrate_lengths(calib_bboxes)
+            else:
+                calibrated_frames = (calibrated_frames + 1) % 30
 
         pred = detection.unsqueeze(0)
         c2 = time.time()
         inf_2 = int((c2-c1) *1000)
+
+        if work_area_choose_start_flag == 1 and len(pred) == 0:
+            work_area_choose_start_flag = 2
+        if work_area_choose_start_flag == 2 and len(pred) == 0:
+            delete_idxs = []
+            for n in range(len(accumulated_cargo_ids)):
+                if len(cargos_pos[n]) < fps * 3: # At least 3 seconds must be tracked cargo.
+                    delete_idxs.append(n)
+                    continue
+
+                init_pos, last_pos = cargos_pos[n][0], cargos_pos[n][-1]
+                print(last_pos, init_pos)
+                diff_pos = (last_pos[0] - init_pos[0], last_pos[1] - init_pos[1])
+                if diff_pos[1] > 0 or abs(diff_pos[1]) < height / 10: # Process only unloading cargos and there should be a Y-axis movement.
+                    delete_idxs.append(n)
+                    continue
+
+                min_value = min(distances_arr[n])
+                min_index = distances_arr[n].index(min_value)
+                work_area_index = min_index
+                distance_tracker.update_workarea(workspaces[work_area_index])
+                distance_tracker.calibrate_reference_area('')
+                suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
+                print(f'********** 1 ***********   unloaded cargo {accumulated_cargo_ids[n]} started from {min_index}st workarea')
+                work_area_choose_start_flag = 3
+
         for i, det in enumerate(pred): # detections per image
             bboxes = []
             classes = []
@@ -581,14 +524,85 @@ def detect(opt):
                 tracker.update(detections)
 
                 # update tracks
-                bboxes, classes, old_classes, distance_estimations,ids = update_tracks(tracker, frame, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, opt.angle, opt.distance_check, opt.wharf, not hasattr(distance_tracker, 'distance_w'), opt.no_nested)
+                bboxes, classes, old_classes, distance_estimations,ids = update_tracks(work_area_index, tracker, frame, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, opt.angle, opt.distance_check, opt.wharf, not hasattr(distance_tracker, 'distance_w'), opt.no_nested)
                 #print("length of bboxes {}".format(bboxes))
                 #print("length of ids {}".format(len(ids)))
+                
+                if work_area_choose_start_flag == 1:
+                    work_area_choose_start_flag = 2
+                    if 'Suspended Lean Object' in classes:
+                        for k in range(len(classes)):
+                            if classes[k] == 'Suspended Lean Object':
+                                ignore_cargo_ids.append(ids[k])
+
+                if work_area_choose_start_flag == 2:
+                    current_cargo_ids = []
+                    for k in range(len(classes)):
+                        if classes[k] == 'Suspended Lean Object':
+                            if ids[k] in ignore_cargo_ids:
+                                continue
+
+                            current_cargo_ids.append(ids[k])
+                            center_point = (int(bboxes[k][0] + bboxes[k][2] / 2), int(bboxes[k][1] + bboxes[k][3] / 2))
+                            distances = []
+                            for pt in center_points:
+                                dist = math.hypot(center_point[0]-pt[0], center_point[1]-pt[1])
+                                distances.append(int(dist))
+
+                            for n in range(len(accumulated_cargo_ids)):
+                                if ids[k] == accumulated_cargo_ids[n]:
+                                    distances_arr[n].append(distances)
+                                    cargos_pos[n].append(center_point)
+
+                            if not ids[k] in accumulated_cargo_ids:
+                                accumulated_cargo_ids.append(ids[k])
+                                distances_arr.append([distances])
+                                cargos_pos.append([center_point])
+
+                    if collections.Counter(accumulated_cargo_ids) != collections.Counter(current_cargo_ids):
+                        delete_idxs = []
+                        for n in range(len(accumulated_cargo_ids)):
+                            if accumulated_cargo_ids[n] not in current_cargo_ids:
+                                print(f'--------->>   Processing {accumulated_cargo_ids[n]} movement')
+                                if len(cargos_pos[n]) < fps * 3: # At least 3 seconds must be tracked cargo.
+                                    print(f'XXXXXXXX  invalid short movement   id: {accumulated_cargo_ids[n]}')
+                                    delete_idxs.append(n)
+                                    continue
+
+                                init_pos, last_pos = cargos_pos[n][0], cargos_pos[n][-1]
+                                print(last_pos, init_pos)
+                                diff_pos = (last_pos[0] - init_pos[0], last_pos[1] - init_pos[1])
+                                if diff_pos[1] > 0 or abs(diff_pos[1]) < 50: # Process only unloading cargos and there should be a Y-axis movement.
+                                    print(f'XXXXXXXX  invalid unloading movement   id: {accumulated_cargo_ids[n]}')
+                                    delete_idxs.append(n)
+                                    continue
+
+                                min_value = min(distances_arr[n][0])
+                                print(distances_arr[n][0])
+                                min_index = distances_arr[n][0].index(min_value)
+                                work_area_index = min_index
+                                distance_tracker.update_workarea(workspaces[work_area_index])
+                                distance_tracker.calibrate_reference_area('')
+                                suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
+                                print(f'********** 2 ***********   unloaded cargo {accumulated_cargo_ids[n]} started from {min_index}st workarea')
+                                work_area_choose_start_flag = 3
+                                
+
+                        for n in range(len(delete_idxs)):
+                            accumulated_cargo_ids.pop(delete_idxs[n])
+                            cargos_pos.pop(delete_idxs[n])
+                            print(f'delete id {delete_idxs[n]}')
+                            distances_arr.pop(delete_idxs[n])
+
+                    print(accumulated_cargo_ids, current_cargo_ids)
+                        
+                        
+
                 c4 = time.time()
                 inf_4 = int((c4-c3) *1000)
 
                 # update distance tracker
-                distance_tracker.calculate_distance(bboxes, classes, old_classes, distance_estimations, frame, frame_count,ids)
+                distance_tracker.calculate_distance(work_area_index, bboxes, classes, old_classes, distance_estimations, frame, frame_count,ids)
                 # Print time (inference + NMS)
                 c5 = time.time()
                 inf_5 = int((c5-c4) *1000)
