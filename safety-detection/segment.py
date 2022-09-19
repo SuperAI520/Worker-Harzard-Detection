@@ -295,8 +295,28 @@ def order_points1(pts):
     # our bottom-right point
     
     (tr, br) = rightMost[np.argsort(rightMost[:, 1]), :]
+
+
+    v1 = [bl[0]-br[0], bl[1]-br[1]]   # Vector 1
+    v2 = [tl[0]-br[0], tl[1]-br[1]]   # Vector 2
+    v3 = [tr[0]-br[0], tr[1]-br[1]]   # Vector 3
+    cross_product1 = v1[0]*v2[1] - v1[1]*v2[0]
+    cross_product2 = v1[0]*v3[1] - v1[1]*v3[0]
+    if cross_product1 < 0:
+        print('cross_product1 < 0')
+        tmp = tl, bl
+        bl = tmp[0]
+        tl = tmp[1]
+
+    if cross_product2 < 0:
+        print('cross_product2 < 0')
+        tmp = tr, br
+        br = tmp[0]
+        tr = tmp[1]
     # return the coordinates in top-left, top-right,
     # bottom-right, and bottom-left order
+
+
     return np.array([bl, br, tr, tl], dtype="float32")
 
 def line_intersection(line1, line2):

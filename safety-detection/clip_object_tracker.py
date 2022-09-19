@@ -471,8 +471,8 @@ def detect(opt):
         if work_area_choose_start_flag == 2 and len(pred) == 0:
             delete_idxs = []
             for n in range(len(accumulated_cargo_ids)):
-                if len(cargos_pos[n]) < fps * 3: # At least 3 seconds must be tracked cargo.
-                    delete_idxs.append(n)
+                if len(cargos_pos[n]) < fps * 1.5: # At least 3 seconds must be tracked cargo.
+                    #delete_idxs.append(n)
                     continue
 
                 init_pos, last_pos = cargos_pos[n][0], cargos_pos[n][-1]
@@ -564,9 +564,9 @@ def detect(opt):
                         for n in range(len(accumulated_cargo_ids)):
                             if accumulated_cargo_ids[n] not in current_cargo_ids:
                                 print(f'--------->>   Processing {accumulated_cargo_ids[n]} movement')
-                                if len(cargos_pos[n]) < fps * 3: # At least 3 seconds must be tracked cargo.
+                                if len(cargos_pos[n]) < fps * 1.5: # At least 3 seconds must be tracked cargo.
                                     print(f'XXXXXXXX  invalid short movement   id: {accumulated_cargo_ids[n]}')
-                                    delete_idxs.append(n)
+                                    # delete_idxs.append(n)
                                     continue
 
                                 init_pos, last_pos = cargos_pos[n][0], cargos_pos[n][-1]
@@ -587,16 +587,12 @@ def detect(opt):
                                 print(f'********** 2 ***********   unloaded cargo {accumulated_cargo_ids[n]} started from {min_index}st workarea')
                                 work_area_choose_start_flag = 3
                                 
-
-                        for n in range(len(delete_idxs)):
-                            accumulated_cargo_ids.pop(delete_idxs[n])
-                            cargos_pos.pop(delete_idxs[n])
-                            print(f'delete id {delete_idxs[n]}')
-                            distances_arr.pop(delete_idxs[n])
+                        print(f'delete ids {delete_idxs}')
+                        accumulated_cargo_ids = [c for j, c in enumerate(accumulated_cargo_ids) if j not in delete_idxs]
+                        cargos_pos = [c for j, c in enumerate(cargos_pos) if j not in delete_idxs]
+                        distances_arr = [c for j, c in enumerate(distances_arr) if j not in delete_idxs]
 
                     print(accumulated_cargo_ids, current_cargo_ids)
-                        
-                        
 
                 c4 = time.time()
                 inf_4 = int((c4-c3) *1000)
@@ -644,7 +640,7 @@ if __name__ == '__main__':
                         help='existing project/name ok, do not increment')
     parser.add_argument('--nms_max_overlap', type=float, default=1.0,
                         help='Non-maxima suppression threshold: Maximum detection overlap.')
-    parser.add_argument('--max_cosine_distance', type=float, default=0.4,
+    parser.add_argument('--max_cosine_distance', type=float, default=0.1,
                         help='Gating threshold for cosine distance metric (object appearance).')
     parser.add_argument('--nn_budget', type=int, default=None,
                         help='Maximum size of the appearance descriptors allery. If None, no budget is enforced.')
