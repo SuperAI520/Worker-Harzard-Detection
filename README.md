@@ -1,8 +1,9 @@
 # End-to-end Safety Detection Pipeline
-
-## Downloading
+## Installation
+### Downloading
 Download this repo and add following files to the specified paths:
-https://drive.google.com/file/d/1wUViXZ-qEPQBvv_SR1AnYHGcHgkjm_fb/view?usp=sharing to the root path.
+https://drive.google.com/file/d/1Yb3LTVYQSWeS3EAZ2XrEw0xMewua2Qz9/view?usp=sharing 
+https://drive.google.com/file/d/18RCemKMiJzsO2sfUwWiBB-LHI4Jbq8Oh/view?usp=sharing
 
 
 <b> Check constants.py file for more details </b>
