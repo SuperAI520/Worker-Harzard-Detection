@@ -1,22 +1,27 @@
 # End-to-end Safety Detection Pipeline
 ## Installation
-### Downloading
-Download this repo and add following files to the specified paths:
+### Download models
+Download following pre-trained models to the specified paths:
 https://drive.google.com/file/d/1Yb3LTVYQSWeS3EAZ2XrEw0xMewua2Qz9/view?usp=sharing 
 https://drive.google.com/file/d/18RCemKMiJzsO2sfUwWiBB-LHI4Jbq8Oh/view?usp=sharing
-
+to the /safety-detection/models
 
 <b> Check constants.py file for more details </b>
 
-## Reference Area
-By using reference_area.py, get reference area coordinates and paste it to safety-detection/constants.py
-You can run this script with the following command:
+### Install
 ```
-python reference_area.py --video_path <video path>
-```
-You will start selecting from left bottom point and continue counter-clockwise.
+# Clone Safety Detection repository
+git clone https://github.com/groundup-ai/optimization_cv_suspended_load.git
 
-## Running End-to-End Pipeline
-After changing paths in the safety-detection/constants.py, run Demo.ipynb notebook.
-* SOURCE variable is for video path.
-* REFERENCE_AREA variable is for reference area coordinates.
+# Install other dependencies
+cd safety-detection
+python -m pip install -r requirements.txt
+
+# Install mmsegmentation dependencies
+cd mmsegmentation
+python -m pip install -v -e .
+
+```
+
+## Use built Docker images
+If you do not have a Docker environment, please refer to https://www.docker.com/.
