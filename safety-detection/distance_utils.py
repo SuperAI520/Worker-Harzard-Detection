@@ -310,7 +310,7 @@ def calculate_danger_zone_coordinates(old_class, box, center_pt, reference_point
     # transform_rate = h / box_diag
     transformed_w = box_w
     if box_diag > min_height:
-        if old_class in ['Container', 'Small Pipe', 'Large Pipe', 'Suspended Lean Object', 'Wooden Board', 'Iron Rake', 'Wood']:
+        if old_class in ['Container', 'Small Pipe', 'Large Pipe', 'Suspended Lean Object', 'Wooden Board', 'Iron Rake', 'Wood', 'Steel Plate']:
             transformed_h = np.sqrt(h ** 2 - transformed_w ** 2)
         else:
             transformed_h = np.sqrt((h / 2) ** 2 - transformed_w ** 2)

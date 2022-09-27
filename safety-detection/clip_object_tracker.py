@@ -102,7 +102,7 @@ def update_tracks(work_area_index, tracker, im0, width, height, ignored_classes,
     suspended_threshold = suspended_threshold_wharf if wharf else suspended_threshold_hatch
     for i in range(len(boxes)):
         x, y, w, h = boxes[i]
-        if classes[i] in ['Container', 'Small Pipe', 'Large Pipe', 'Wooden Board', 'Iron Rake', 'Wood', 'Coil']:
+        if classes[i] in ['Container', 'Small Pipe', 'Large Pipe', 'Wooden Board', 'Iron Rake', 'Wood', 'Coil', 'Steel Plate']:
             classes[i] = 'Suspended Lean Object'
 
         if work_area_index == -1:
