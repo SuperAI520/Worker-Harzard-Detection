@@ -29,7 +29,7 @@ class DetectWorkspace:
         color_seg[seg == 1, :] = [255, 0, 0]
         # mmcv.imwrite(color_seg, "out.png")
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (min_size,min_size))
-        color_seg = cv2.morphologyEx(color_seg, cv2.MORPH_OPEN, kernel)	
+        # color_seg = cv2.morphologyEx(color_seg, cv2.MORPH_OPEN, kernel)	
         color_seg = cv2.cvtColor(color_seg, cv2.COLOR_BGR2GRAY)
         cnts, hiers = cv2.findContours(color_seg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
