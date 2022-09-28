@@ -25,7 +25,7 @@ class DistanceTracker:
         self.scale_w, self.scale_h = utills.get_scale(self.width, self.height)
 
         fourcc = cv2.VideoWriter_fourcc(*"XVID")
-        self.output_movie = cv2.VideoWriter(f"{output_dir}/{source.split('/')[-1].split('.')[0]}_dist.avi", fourcc, fps, (int(self.width*constants.OUTPUT_RES_RATIO), int(self.height*constants.OUTPUT_RES_RATIO)+constants.REPORT_PAD))
+        self.output_movie = cv2.VideoWriter(f"{output_dir}/{source.split('/')[-1].split('.')[0]}_dist.avi", fourcc, fps, (int(self.width*constants.OUTPUT_RES_RATIO), int(self.height*constants.OUTPUT_RES_RATIO)))
         self.calibrated_frames = 0
 
         self.ignored_classes = ignored_classes

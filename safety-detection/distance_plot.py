@@ -111,10 +111,10 @@ def social_distancing_view(frame, pairs, boxes, inversed_pts, heights,ids,all_vi
     new_size = (int(frame.shape[1]*constants.OUTPUT_RES_RATIO), int(frame.shape[0]*constants.OUTPUT_RES_RATIO))
     frame = cv2.resize(frame, new_size)
     
-    pad = np.full((140,frame.shape[1],3), [110, 110, 100], dtype=np.uint8)
-    cv2.putText(pad, "Red bounding boxes denote people in danger zone.", (50, 30),cv2.FONT_HERSHEY_SIMPLEX, 0.7, (100, 100, 0), 2)
-    cv2.putText(pad, "-- RISK : " + str(risk_count) + " people", (50, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 1)
-    frame = np.vstack((frame,pad))
+    # pad = np.full((140,frame.shape[1],3), [110, 110, 100], dtype=np.uint8)
+    # cv2.putText(pad, "Red bounding boxes denote people in danger zone.", (50, 30),cv2.FONT_HERSHEY_SIMPLEX, 0.7, (100, 100, 0), 2)
+    # cv2.putText(pad, "-- RISK : " + str(risk_count) + " people", (50, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 1)
+    # frame = np.vstack((frame,pad))
             
     return frame,all_violations
 
@@ -268,8 +268,8 @@ def no_action(frame):
     new_size = (int(frame.shape[1]*constants.OUTPUT_RES_RATIO), int(frame.shape[0]*constants.OUTPUT_RES_RATIO))
     frame = cv2.resize(frame, new_size)
     
-    pad = np.full((140,frame.shape[1],3), [110, 110, 100], dtype=np.uint8)
-    cv2.putText(pad, "No action is taken since no people is detected!", (50, 50),cv2.FONT_HERSHEY_SIMPLEX, 1.5, (100, 100, 0), 3)
-    frame = np.vstack((frame,pad))
+    # pad = np.full((140,frame.shape[1],3), [110, 110, 100], dtype=np.uint8)
+    # cv2.putText(pad, "No action is taken since no people is detected!", (50, 50),cv2.FONT_HERSHEY_SIMPLEX, 1.5, (100, 100, 0), 3)
+    # frame = np.vstack((frame,pad))
 
     return frame
