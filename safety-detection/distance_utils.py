@@ -301,6 +301,7 @@ def calculate_danger_zone_coordinates(old_class, box, center_pt, reference_point
     
     box_w, box_h = box[2:]
     box_diag = np.sqrt(box_w ** 2 + box_h ** 2)
+    print(reference_points)
 
     distance1 = np.linalg.norm(np.cross(reference_points[1]-reference_points[0],reference_points[2]-reference_points[0])/np.linalg.norm(reference_points[1]-reference_points[0]))
     distance2 = np.linalg.norm(np.cross(reference_points[1]-reference_points[0],reference_points[3]-reference_points[0])/np.linalg.norm(reference_points[1]-reference_points[0]))

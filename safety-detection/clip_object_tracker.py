@@ -247,7 +247,7 @@ def update_tracks(work_area_index, tracker, im0, width, height, ignored_classes,
             xyxy = xywh2xyxy(box)
             original_label = f'{detection} #{track_id}'
             label = f'{original_label} {cur_distance} CM' if distance_check else original_label
-            # plot_one_box(xyxy, im0, label=label,color=get_color_for(original_label), line_thickness=3)
+            plot_one_box(xyxy, im0, label=label,color=get_color_for(original_label), line_thickness=3)
     return boxes, classes, old_classes, distance_estimations,ids
 
 def get_color_for(class_num):
@@ -398,6 +398,7 @@ def detect(opt):
     cargos_pos = []
     work_area_index = -1
 
+    tracking_cycles_wharf = 3
     suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = 0, 0, 0
     workspaces, height_edges = [], []
     print('Safety zone detection starts...')
@@ -414,23 +415,30 @@ def detect(opt):
         if frame_count == 0:
             distance_tracker = DistanceTracker(frame, opt.source, height, width, fps, ignored_classes, opt.danger_zone_width_threshold, opt.danger_zone_height_threshold, workspaces, height_edges, opt.wharf, opt.angle, save_dir)
 
-        if (frame_count / fps) % 300 == 0 or len(workspaces) == 0:
+        # if (frame_count / fps) % 300 == 0 or len(workspaces) == 0:
+        if (frame_count / fps) % 300 == 0:
             work_area_choose_start_flag = 1
             distances_arr.clear()
             cargos_pos.clear()
             accumulated_cargo_ids.clear()
             ignore_cargo_ids.clear()
 
-            workspaces, center_points, height_edges = workspace_detector.detect_workspace(frame)
-            if len(workspaces) == 0:
-                frame_count = frame_count+1
-                if frame_count == frames:
-                    break
+
+
+            # work_area_choose_start_flag = 3
+            work_area_index = 0
+
+            suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
+            # workspaces, center_points, height_edges = workspace_detector.detect_workspace(frame)
+            # if len(workspaces) == 0:
+            #     frame_count = frame_count+1
+            #     if frame_count == frames:
+            #         break
                 
-                # cv2.imshow("output", frame)
-                if cv2.waitKey(1) == ord('q'):
-                    break
-                continue
+            #     # cv2.imshow("output", frame)
+            #     if cv2.waitKey(1) == ord('q'):
+            #         break
+            #     continue
 
             if len(workspaces) == 1:
                 print(f'*********************   only 1 work area')
@@ -530,7 +538,7 @@ def detect(opt):
                 
                 if work_area_choose_start_flag == 1:
                     work_area_choose_start_flag = 2
-                    if 'Suspended Lean Object' in classes:
+                    if 'Suspended Lean Object' in classes and not opt.wharf:
                         for k in range(len(classes)):
                             if classes[k] == 'Suspended Lean Object':
                                 ignore_cargo_ids.append(ids[k])
@@ -543,10 +551,18 @@ def detect(opt):
                                 continue
 
                             current_cargo_ids.append(ids[k])
-                            center_point = (int(bboxes[k][0] + bboxes[k][2] / 2), int(bboxes[k][1] + bboxes[k][3] / 2))
+                            if not opt.wharf:
+                                center_point = (int(bboxes[k][0] + bboxes[k][2] / 2), int(bboxes[k][1] + bboxes[k][3] / 2))
+                            else: 
+                                center_point = (int(bboxes[k][0] + bboxes[k][2] / 2), int(bboxes[k][1] + bboxes[k][3]))
+
                             distances = []
-                            for pt in center_points:
-                                dist = math.hypot(center_point[0]-pt[0], center_point[1]-pt[1])
+                            if not opt.wharf:
+                                for pt in center_points:
+                                    dist = math.hypot(center_point[0]-pt[0], center_point[1]-pt[1])
+                                    distances.append(int(dist))
+                            else:
+                                dist = math.hypot(0, center_point[1]-0)
                                 distances.append(int(dist))
 
                             for n in range(len(accumulated_cargo_ids)):
@@ -556,6 +572,7 @@ def detect(opt):
 
                             if not ids[k] in accumulated_cargo_ids:
                                 accumulated_cargo_ids.append(ids[k])
+                                print(f' added new cargo  {ids[k]}')
                                 distances_arr.append([distances])
                                 cargos_pos.append([center_point])
 
@@ -572,20 +589,31 @@ def detect(opt):
                                 init_pos, last_pos = cargos_pos[n][0], cargos_pos[n][-1]
                                 print(last_pos, init_pos)
                                 diff_pos = (last_pos[0] - init_pos[0], last_pos[1] - init_pos[1])
-                                if diff_pos[1] > 0 or abs(diff_pos[1]) < 50: # Process only unloading cargos and there should be a Y-axis movement.
-                                    print(f'XXXXXXXX  invalid unloading movement   id: {accumulated_cargo_ids[n]}')
-                                    delete_idxs.append(n)
-                                    continue
+                                if not opt.wharf:
+                                    if diff_pos[1] > 0 or abs(diff_pos[1]) < 50: # Process only unloading cargos and there should be a Y-axis movement.
+                                        print(f'XXXXXXXX  invalid unloading movement   id: {accumulated_cargo_ids[n]}')
+                                        delete_idxs.append(n)
+                                        continue
 
-                                min_value = min(distances_arr[n][0])
-                                print(distances_arr[n][0])
-                                min_index = distances_arr[n][0].index(min_value)
-                                work_area_index = min_index
-                                distance_tracker.update_workarea(workspaces[work_area_index])
-                                distance_tracker.calibrate_reference_area('')
-                                suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
-                                print(f'********** 2 ***********   unloaded cargo {accumulated_cargo_ids[n]} started from {min_index}st workarea')
-                                work_area_choose_start_flag = 3
+                                    min_value = min(distances_arr[n][0])
+                                    print(distances_arr[n][0])
+                                    min_index = distances_arr[n][0].index(min_value)
+                                    work_area_index = min_index
+                                    distance_tracker.update_workarea(workspaces[work_area_index])
+                                    distance_tracker.calibrate_reference_area('')
+                                    suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
+                                    print(f'********** 2 ***********   unloaded cargo {accumulated_cargo_ids[n]} started from {min_index}st workarea')
+                                else:
+                                    if diff_pos[1] < 0 or abs(diff_pos[1]) < 50: # Process only unloading cargos and there should be a Y-axis movement.
+                                        print(f'XXXXXXXX  invalid loading movement   id: {accumulated_cargo_ids[n]}')
+                                        delete_idxs.append(n)
+                                        continue
+                                    print(f'********** 2 ***********   loaded cargo {accumulated_cargo_ids[n]} to ({last_pos})')
+                                    frame = cv2.line(frame, (0, last_pos[1]), (width, last_pos[1]), (0, 255, 0), 5)
+                                    
+
+                                
+                                # work_area_choose_start_flag = 3
                                 
                         print(f'delete ids {delete_idxs}')
                         accumulated_cargo_ids = [c for j, c in enumerate(accumulated_cargo_ids) if j not in delete_idxs]

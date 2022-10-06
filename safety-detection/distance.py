@@ -36,6 +36,7 @@ class DistanceTracker:
         self.fps=fps
 
     def update_workarea(self, work_area):
+        return
         self.reference_points = work_area
 
     def update_edgepoints(self, edge_points):
@@ -47,7 +48,7 @@ class DistanceTracker:
         return self.suspended_threshold_hatch, self.suspended_threshold_wharf, self.suspended_threshold_wharf_side
 
     def calibrate_reference_area(self, video_file):
-        # self.reference_points = constants.REFERENCE_AREA_DICT[video_file] #get_keypoints(frame)
+        self.reference_points = np.array(constants.REFERENCE_AREA_DICT[video_file]) #get_keypoints(frame)
         if len(self.reference_points) == 0:
             return
         print(self.reference_points)

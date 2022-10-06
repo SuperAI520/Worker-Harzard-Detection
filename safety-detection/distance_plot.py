@@ -64,11 +64,11 @@ def social_distancing_view(frame, pairs, boxes, inversed_pts, heights,ids,all_vi
         proj_center = (int(inversed_pts[i][0]), int(inversed_pts[i][1]))
         bbox_center = (int(xi+wi/2), int(yi+hi/2))
         frame = cv2.rectangle(frame,(int(xi),int(yi)),(int(xi+wi),int(yi+hi)),blue,2)
-        #frame = cv2.circle(frame, bbox_center, 5, yellow, 10)
-        #frame = cv2.circle(frame, proj_center, 5, yellow, 10)
-        #frame = cv2.line(frame, proj_center, bbox_center, red, 2)
-        #text_place = (int(bbox_center[0]*0.5 + proj_center[0]*0.5), int(bbox_center[1]*0.5 + proj_center[1]*0.5))
-        #frame = cv2.putText(frame, f'{heights[i]} CM', text_place, cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 255), 4)
+        frame = cv2.circle(frame, bbox_center, 5, yellow, 10)
+        frame = cv2.circle(frame, proj_center, 5, yellow, 10)
+        frame = cv2.line(frame, proj_center, bbox_center, red, 2)
+        text_place = (int(bbox_center[0]*0.5 + proj_center[0]*0.5), int(bbox_center[1]*0.5 + proj_center[1]*0.5))
+        frame = cv2.putText(frame, f'{heights[i]} CM', text_place, cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 255), 4)
         xj, yj, wj, hj = boxes[j]
         pt = inversed_pts[j]
         obj_id=ids[j]
