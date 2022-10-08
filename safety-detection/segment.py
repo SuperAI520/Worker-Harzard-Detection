@@ -33,15 +33,23 @@ class DetectWorkspace:
         color_seg = cv2.cvtColor(color_seg, cv2.COLOR_BGR2GRAY)
         cnts, hiers = cv2.findContours(color_seg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
+        # eliminate too small cargo areas
         area_max = 0
-        #Find biggest contour
-        biggest_cnt = []
+        area_array = []
+        new_cnts = []
         for cnt in cnts:
-            # area = cv2.contourArea(cnt)
-            # if (area_max < area):
-            #     area_max = area
-            #     biggest_cnt = cnt 
+            area = cv2.contourArea(cnt)
+            area_array.append(area)
+            if (area_max < area):
+                area_max = area
 
+        thr_area = area_max // 5
+        print(area_array, thr_area)
+        for i, cnt in enumerate(cnts):
+            if area_array[i] > thr_area:
+                new_cnts.append(cnt)
+        
+        for cnt in new_cnts:
             hull = cv2.convexHull(cnt)
             
             rect = cv2.minAreaRect(hull)
@@ -237,7 +245,7 @@ class DetectWorkspace:
 
 
         edge_pts = []
-        for cnt in cnts:
+        for cnt in new_cnts:
             num_of_edge = len(cnt)
             approx = cnt
             rate = 0.0001

@@ -13,7 +13,6 @@ import cv2
 import torch
 import numpy as np
 import math
-import collections 
 
 # deep sort imports
 from deep_sort import preprocessing, nn_matching
@@ -23,6 +22,8 @@ from tools import generate_clip_detections as gdet
 
 from segment import DetectWorkspace
 from distance import DistanceTracker
+from cargo_tracker import CargoTracker
+
 import constants
 from utils_.yolor import Yolor
 # from utils_.yolov5 import Yolov5, Yolov5_IV
@@ -364,6 +365,7 @@ def detect(opt):
     global names
     names = engine.get_names()
     workspace_detector = DetectWorkspace()
+
     # initialize tracker
     tracker = Tracker(metric)
 
@@ -377,6 +379,7 @@ def detect(opt):
     # Initialize
     set_logging()      
 
+    # init VideoCapture
     cap = cv2.VideoCapture(source)
     vid_path, vid_writer = None, None
     if not cap.isOpened():
@@ -393,10 +396,9 @@ def detect(opt):
     distance_tracker = None
     calibrated_frames = 0
 
-    work_area_choose_start_flag = 0 # 0: not process 1: ready to detect first cargo detection 2: in process 3: end process
-    ignore_cargo_ids, accumulated_cargo_ids, distances_arr = [], [], []
-    cargos_pos = []
+    # initialize cargo tracker
     work_area_index = -1
+    cargo_tracker = CargoTracker(opt.wharf, fps, height, width)
 
     suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = 0, 0, 0
     workspaces, height_edges = [], []
@@ -414,12 +416,8 @@ def detect(opt):
         if frame_count == 0:
             distance_tracker = DistanceTracker(frame, opt.source, height, width, fps, ignored_classes, opt.danger_zone_width_threshold, opt.danger_zone_height_threshold, workspaces, height_edges, opt.wharf, opt.angle, save_dir)
 
-        if (frame_count / fps) % 300 == 0 or len(workspaces) == 0:
-            work_area_choose_start_flag = 1
-            distances_arr.clear()
-            cargos_pos.clear()
-            accumulated_cargo_ids.clear()
-            ignore_cargo_ids.clear()
+        if (frame_count / fps) % 300 == 0 or len(workspaces) == 0: # detect work area once every 5 mins
+            cargo_tracker.clear()
 
             workspaces, center_points, height_edges = workspace_detector.detect_workspace(frame)
             if len(workspaces) == 0:
@@ -435,7 +433,7 @@ def detect(opt):
             if len(workspaces) == 1:
                 print(f'*********************   only 1 work area')
                 work_area_index = 0
-                work_area_choose_start_flag = 3
+                cargo_tracker.set_step(3)
                 distance_tracker.update_workarea(workspaces[work_area_index])
                 distance_tracker.calibrate_reference_area('')
                 suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
@@ -465,31 +463,13 @@ def detect(opt):
         pred = detection.unsqueeze(0)
         c2 = time.time()
         inf_2 = int((c2-c1) *1000)
-
-        if work_area_choose_start_flag == 1 and len(pred) == 0:
-            work_area_choose_start_flag = 2
-        if work_area_choose_start_flag == 2 and len(pred) == 0:
-            delete_idxs = []
-            for n in range(len(accumulated_cargo_ids)):
-                if len(cargos_pos[n]) < fps * 1.5: # At least 3 seconds must be tracked cargo.
-                    #delete_idxs.append(n)
-                    continue
-
-                init_pos, last_pos = cargos_pos[n][0], cargos_pos[n][-1]
-                print(last_pos, init_pos)
-                diff_pos = (last_pos[0] - init_pos[0], last_pos[1] - init_pos[1])
-                if diff_pos[1] > 0 or abs(diff_pos[1]) < height / 10: # Process only unloading cargos and there should be a Y-axis movement.
-                    delete_idxs.append(n)
-                    continue
-
-                min_value = min(distances_arr[n])
-                min_index = distances_arr[n].index(min_value)
-                work_area_index = min_index
+        
+        if len(pred) == 0: # detect main work area from candidates
+            result, work_area_index = cargo_tracker.track_no_detection_case(work_area_index)
+            if result:
                 distance_tracker.update_workarea(workspaces[work_area_index])
                 distance_tracker.calibrate_reference_area('')
                 suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
-                print(f'********** 1 ***********   unloaded cargo {accumulated_cargo_ids[n]} started from {min_index}st workarea')
-                work_area_choose_start_flag = 3
 
         for i, det in enumerate(pred): # detections per image
             bboxes = []
@@ -528,71 +508,12 @@ def detect(opt):
                 #print("length of bboxes {}".format(bboxes))
                 #print("length of ids {}".format(len(ids)))
                 
-                if work_area_choose_start_flag == 1:
-                    work_area_choose_start_flag = 2
-                    if 'Suspended Lean Object' in classes:
-                        for k in range(len(classes)):
-                            if classes[k] == 'Suspended Lean Object':
-                                ignore_cargo_ids.append(ids[k])
-
-                if work_area_choose_start_flag == 2:
-                    current_cargo_ids = []
-                    for k in range(len(classes)):
-                        if classes[k] == 'Suspended Lean Object':
-                            if ids[k] in ignore_cargo_ids:
-                                continue
-
-                            current_cargo_ids.append(ids[k])
-                            center_point = (int(bboxes[k][0] + bboxes[k][2] / 2), int(bboxes[k][1] + bboxes[k][3] / 2))
-                            distances = []
-                            for pt in center_points:
-                                dist = math.hypot(center_point[0]-pt[0], center_point[1]-pt[1])
-                                distances.append(int(dist))
-
-                            for n in range(len(accumulated_cargo_ids)):
-                                if ids[k] == accumulated_cargo_ids[n]:
-                                    distances_arr[n].append(distances)
-                                    cargos_pos[n].append(center_point)
-
-                            if not ids[k] in accumulated_cargo_ids:
-                                accumulated_cargo_ids.append(ids[k])
-                                distances_arr.append([distances])
-                                cargos_pos.append([center_point])
-
-                    if collections.Counter(accumulated_cargo_ids) != collections.Counter(current_cargo_ids):
-                        delete_idxs = []
-                        for n in range(len(accumulated_cargo_ids)):
-                            if accumulated_cargo_ids[n] not in current_cargo_ids:
-                                print(f'--------->>   Processing {accumulated_cargo_ids[n]} movement')
-                                if len(cargos_pos[n]) < fps * 1.5: # At least 3 seconds must be tracked cargo.
-                                    print(f'XXXXXXXX  invalid short movement   id: {accumulated_cargo_ids[n]}')
-                                    # delete_idxs.append(n)
-                                    continue
-
-                                init_pos, last_pos = cargos_pos[n][0], cargos_pos[n][-1]
-                                print(last_pos, init_pos)
-                                diff_pos = (last_pos[0] - init_pos[0], last_pos[1] - init_pos[1])
-                                if diff_pos[1] > 0 or abs(diff_pos[1]) < 50: # Process only unloading cargos and there should be a Y-axis movement.
-                                    print(f'XXXXXXXX  invalid unloading movement   id: {accumulated_cargo_ids[n]}')
-                                    delete_idxs.append(n)
-                                    continue
-
-                                min_value = min(distances_arr[n][0])
-                                print(distances_arr[n][0])
-                                min_index = distances_arr[n][0].index(min_value)
-                                work_area_index = min_index
-                                distance_tracker.update_workarea(workspaces[work_area_index])
-                                distance_tracker.calibrate_reference_area('')
-                                suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
-                                print(f'********** 2 ***********   unloaded cargo {accumulated_cargo_ids[n]} started from {min_index}st workarea')
-                                work_area_choose_start_flag = 3
-                                
-                        print(f'delete ids {delete_idxs}')
-                        accumulated_cargo_ids = [c for j, c in enumerate(accumulated_cargo_ids) if j not in delete_idxs]
-                        cargos_pos = [c for j, c in enumerate(cargos_pos) if j not in delete_idxs]
-                        distances_arr = [c for j, c in enumerate(distances_arr) if j not in delete_idxs]
-
-                    print(accumulated_cargo_ids, current_cargo_ids)
+                # track unloading cargo and detect main work area from candidates
+                result, work_area_index = cargo_tracker.track(work_area_index, ids, classes, bboxes, center_points)
+                if result:
+                    distance_tracker.update_workarea(workspaces[work_area_index])
+                    distance_tracker.calibrate_reference_area('')
+                    suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
 
                 c4 = time.time()
                 inf_4 = int((c4-c3) *1000)
