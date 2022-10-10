@@ -189,7 +189,7 @@ def get_min_distance(p0, p1, p2, shape):
 
     return distance
     
-def calculate_edge_to_person(roi_edge,frame, ori_shape, boxes,classes,frame_id,all_violations,ids,output_dir,fps):
+def calculate_edge_to_person(roi_edge,frame, ori_shape, boxes,classes,frame_id, thr_f_h, all_violations,ids,output_dir,fps):
     #roi_pts = np.array(self.reference_points, np.int32)\
     green = (0, 255, 0)
     text_scale = 1.5
@@ -200,6 +200,7 @@ def calculate_edge_to_person(roi_edge,frame, ori_shape, boxes,classes,frame_id,a
     snap_path=output_dir
     risk_count = 0
     vessel_area="hatch"
+    viol_thresh_fl_fh = thr_f_h
     #roi_edge = [self.reference_points[0],self.reference_points[1]]
     for i in range(len(boxes)):
         if classes[i]=='People':

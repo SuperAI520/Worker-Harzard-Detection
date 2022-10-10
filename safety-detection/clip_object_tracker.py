@@ -519,7 +519,7 @@ def detect(opt):
                 inf_4 = int((c4-c3) *1000)
 
                 # update distance tracker
-                distance_tracker.calculate_distance(work_area_index, bboxes, classes, old_classes, distance_estimations, frame, frame_count,ids)
+                distance_tracker.calculate_distance(work_area_index, bboxes, classes, old_classes, distance_estimations, frame, frame_count,ids, opt.thr_f_h)
                 # Print time (inference + NMS)
                 c5 = time.time()
                 inf_5 = int((c5-c4) *1000)
@@ -565,6 +565,9 @@ if __name__ == '__main__':
                         help='Gating threshold for cosine distance metric (object appearance).')
     parser.add_argument('--nn_budget', type=int, default=None,
                         help='Maximum size of the appearance descriptors allery. If None, no budget is enforced.')
+
+    parser.add_argument('--thr_f_h', type=float, default=0.9,
+                        help='Threshold for the fall_from_height')
 
     opt = parser.parse_args()
     print(opt)
