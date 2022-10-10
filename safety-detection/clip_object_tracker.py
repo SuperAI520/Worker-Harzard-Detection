@@ -399,6 +399,7 @@ def detect(opt):
     work_area_index = -1
 
     tracking_cycles_wharf = 3
+    landing_Y = []
     suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = 0, 0, 0
     workspaces, height_edges = [], []
     print('Safety zone detection starts...')
@@ -417,11 +418,13 @@ def detect(opt):
 
         # if (frame_count / fps) % 300 == 0 or len(workspaces) == 0:
         if (frame_count / fps) % 300 == 0:
+            if work_area_choose_start_flag == 0:
+                distances_arr.clear()
+                cargos_pos.clear()
+                accumulated_cargo_ids.clear()
+                ignore_cargo_ids.clear()
+
             work_area_choose_start_flag = 1
-            distances_arr.clear()
-            cargos_pos.clear()
-            accumulated_cargo_ids.clear()
-            ignore_cargo_ids.clear()
 
 
 
@@ -451,6 +454,9 @@ def detect(opt):
             distance_tracker.update_edgepoints(height_edges)
 
         cv2.drawContours(frame, height_edges, -1, (0, 0, 255), 5)
+
+        for iid, Y_value in landing_Y:
+            frame = cv2.line(frame, (0, Y_value), (width, Y_value), (0, 255, 0), 5)
 
         detection = get_detection_frame_yolor(frame, engine)
         c1 = time.time()
@@ -580,9 +586,9 @@ def detect(opt):
                         delete_idxs = []
                         for n in range(len(accumulated_cargo_ids)):
                             if accumulated_cargo_ids[n] not in current_cargo_ids:
-                                print(f'--------->>   Processing {accumulated_cargo_ids[n]} movement')
+                                # print(f'--------->>   Processing {accumulated_cargo_ids[n]} movement')
                                 if len(cargos_pos[n]) < fps * 1.5: # At least 3 seconds must be tracked cargo.
-                                    print(f'XXXXXXXX  invalid short movement   id: {accumulated_cargo_ids[n]}')
+                                    # print(f'XXXXXXXX  invalid short movement   id: {accumulated_cargo_ids[n]}')
                                     # delete_idxs.append(n)
                                     continue
 
@@ -608,9 +614,34 @@ def detect(opt):
                                         print(f'XXXXXXXX  invalid loading movement   id: {accumulated_cargo_ids[n]}')
                                         delete_idxs.append(n)
                                         continue
+
+                                    tmp = distance_tracker.get_workarea()
+                                    inside = cv2.pointPolygonTest(tmp, last_pos, False)
+                                    if inside < 0:
+                                        print('$$$$$$$$$$$$$$$$$$$$$$$$$   out of workspace')
+                                        delete_idxs.append(n)
+                                        continue
+
                                     print(f'********** 2 ***********   loaded cargo {accumulated_cargo_ids[n]} to ({last_pos})')
-                                    frame = cv2.line(frame, (0, last_pos[1]), (width, last_pos[1]), (0, 255, 0), 5)
-                                    
+                                    if tracking_cycles_wharf > 0:
+                                        flag = False
+                                        for z, iid_y in enumerate(landing_Y):
+                                            if iid_y[0] == accumulated_cargo_ids[n]:
+                                                landing_Y[z][1] = last_pos[1]
+                                                flag = True
+                                                break
+
+                                        if not flag:
+                                            landing_Y.append([accumulated_cargo_ids[n], last_pos[1]])
+                                            tracking_cycles_wharf -= 1
+                                    else:
+                                        print('###########################   END tracking')
+
+                                    distances_arr.clear()
+                                    cargos_pos.clear()
+                                    accumulated_cargo_ids.clear()
+                                    ignore_cargo_ids.clear()
+                                    break
 
                                 
                                 # work_area_choose_start_flag = 3
@@ -620,7 +651,7 @@ def detect(opt):
                         cargos_pos = [c for j, c in enumerate(cargos_pos) if j not in delete_idxs]
                         distances_arr = [c for j, c in enumerate(distances_arr) if j not in delete_idxs]
 
-                    print(accumulated_cargo_ids, current_cargo_ids)
+                    print(accumulated_cargo_ids, current_cargo_ids, landing_Y)
 
                 c4 = time.time()
                 inf_4 = int((c4-c3) *1000)

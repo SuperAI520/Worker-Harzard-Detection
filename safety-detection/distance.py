@@ -34,7 +34,9 @@ class DistanceTracker:
         self.wharf = wharf
         self.all_violations=dict()
         self.fps=fps
-
+    def get_workarea(self):
+        return self.reference_points
+        
     def update_workarea(self, work_area):
         return
         self.reference_points = work_area
