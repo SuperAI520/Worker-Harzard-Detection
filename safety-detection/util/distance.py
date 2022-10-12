@@ -9,6 +9,8 @@ from util.keypoint_detection import get_keypoints
 import constants
 import torch
 import torchvision.ops.boxes as bops
+import threading
+from util.db_manager import s3_sqs_handler, handle_annot_frames_buffer
 
 class DistanceTracker:
     def __init__(self, frame, source, height, width, fps, ignored_classes, danger_zone_width_threshold, danger_zone_height_threshold, work_area, height_edges, wharf,angle, output_dir):
@@ -183,15 +185,27 @@ class DistanceTracker:
                 # Show/write image and videos
 
             if new_sload_prox or new_Fall_F_H:
-                db_manager.snap_image(img)
-                db_manager.record_start(img)
+                viol_text = ''
+                if new_sload_prox:
+                    viol_text += 'sload_prox_'
+                if new_Fall_F_H:
+                    viol_text += 'Fall_F_H_'
+
+                snap_path, snap_imgname = db_manager.snap_image(img, viol_text)
+                # db_manager.record_start(img)
+                # s_img_name = snap_imgname.split('/')[-1].split('.')[0]
+
+                s3_sqs_thread = threading.Thread(target=s3_sqs_handler,args=(snap_path, snap_imgname,snap_imgname,viol_text,count,frame.shape[0],frame.shape[1], self.fps, True,))
+                s3_sqs_thread.daemon = True
+                s3_sqs_thread.start()
         else:
             no_action+=1
             print("no action {} and {}".format(no_action,count))
             img = plot.no_action(frame)
         if count != 0:
             self.output_movie.write(img)
-            db_manager.record_update(img)
+            handle_annot_frames_buffer(frame=img,frame_id=count)
+            # db_manager.record_update(img)
         
         if count == 0:
             cv2.imwrite(f"{self.output_dir}/frame%d.jpg" % count, img)
