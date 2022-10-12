@@ -3,9 +3,9 @@ import cv2
 import numpy as np
 import time
 import argparse
-import distance_utils as utills
-import distance_plot as plot
-from keypoint_detection import get_keypoints
+import util.distance_utils as utills
+import util.distance_plot as plot
+from util.keypoint_detection import get_keypoints
 import constants
 import torch
 import torchvision.ops.boxes as bops
@@ -157,7 +157,7 @@ class DistanceTracker:
             centers.append((x,y))
         return centers
 
-    def calculate_distance(self, work_area_index, boxes, classes, old_classes, distance_estimations, frame, count,ids, thr_f_h):
+    def calculate_distance(self, work_area_index, boxes, classes, old_classes, distance_estimations, frame, count,ids, thr_f_h, db_manager):
         # boxes = []
         # classes = []
         #boxes, classes = self.get_bboxes(tracker, names)
@@ -166,26 +166,32 @@ class DistanceTracker:
         roi_pts = np.array(self.reference_points, np.int32)
         cv2.polylines(frame, [roi_pts], True, (70, 70, 70), thickness=10)
         #frame1 = np.copy(frame)
+        new_sload_prox, new_Fall_F_H = False, False
         if hasattr(self, 'distance_w') and work_area_index != -1:
             # print('Distance', len(boxes))
             pairs, warped_pts, danger_zones, heights = utills.get_distances(boxes, self.reference_points, self.perspective_transform, self.inverse_perspective_transform, classes, old_classes, self.distance_w, self.distance_h, self.width, self.height, self.danger_zone_width_threshold, self.danger_zone_height_threshold, self.wharf_human_height, self.wharf)
             reversed_pts = utills.get_perspective_transform(warped_pts, self.inverse_perspective_transform)
             reversed_danger_zones = utills.get_reversed_danger_zones(danger_zones, self.inverse_perspective_transform)
             img = plot.draw_danger_zones(frame, reversed_danger_zones)
-            img,self.all_violations = plot.social_distancing_view(img, pairs, boxes, reversed_pts, heights,ids,self.all_violations,count,self.fps,self.filename,self.wharf) #social_distancing_view(img, pairs, boxes, reversed_pts, heights)
+            img, new_sload_prox, self.all_violations = plot.social_distancing_view(img, pairs, boxes, reversed_pts, heights,ids,self.all_violations,count,self.fps,self.filename,self.wharf) #social_distancing_view(img, pairs, boxes, reversed_pts, heights)
             # print('Distance', len(boxes))
             if not self.wharf:
                 roi_edge= self.edge_points
                 # print(roi_edge)
-                img,self.all_violations=plot.calculate_edge_to_person(roi_edge,img, frame.shape, boxes, classes,count, thr_f_h, self.all_violations,ids,self.filename,self.fps)
+                img, new_Fall_F_H, self.all_violations=plot.calculate_edge_to_person(roi_edge,img, frame.shape, boxes, classes,count, thr_f_h, self.all_violations,ids,self.filename,self.fps)
                 #print(self.all_violations)
                 # Show/write image and videos
+
+            if new_sload_prox or new_Fall_F_H:
+                db_manager.snap_image(img)
+                db_manager.record_start(img)
         else:
             no_action+=1
             print("no action {} and {}".format(no_action,count))
             img = plot.no_action(frame)
         if count != 0:
             self.output_movie.write(img)
+            db_manager.record_update(img)
         
         if count == 0:
             cv2.imwrite(f"{self.output_dir}/frame%d.jpg" % count, img)

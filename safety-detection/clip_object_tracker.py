@@ -20,9 +20,10 @@ from deep_sort.detection import Detection
 from deep_sort.tracker import Tracker
 from tools import generate_clip_detections as gdet
 
-from segment import DetectWorkspace
-from distance import DistanceTracker
-from cargo_tracker import CargoTracker
+from util.segment import DetectWorkspace
+from util.distance import DistanceTracker
+from util.cargo_tracker import CargoTracker
+from util.db_manager import DBManager
 
 import constants
 from utils_.yolor import Yolor
@@ -396,6 +397,9 @@ def detect(opt):
     distance_tracker = None
     calibrated_frames = 0
 
+    # init DBManager
+    db_manager = DBManager(source, width, height, fps, save_dir)
+
     # initialize cargo tracker
     work_area_index = -1
     cargo_tracker = CargoTracker(opt.wharf, fps, height, width)
@@ -519,7 +523,7 @@ def detect(opt):
                 inf_4 = int((c4-c3) *1000)
 
                 # update distance tracker
-                distance_tracker.calculate_distance(work_area_index, bboxes, classes, old_classes, distance_estimations, frame, frame_count,ids, opt.thr_f_h)
+                distance_tracker.calculate_distance(work_area_index, bboxes, classes, old_classes, distance_estimations, frame, frame_count,ids, opt.thr_f_h, db_manager)
                 # Print time (inference + NMS)
                 c5 = time.time()
                 inf_5 = int((c5-c4) *1000)

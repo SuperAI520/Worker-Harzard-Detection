@@ -6,6 +6,7 @@ import os.path as osp
 import time
 import requests
 import math
+
 # Function to draw Bird Eye View for region of interest(ROI). Red, Yellow, Green points represents risk to human. 
 # Red: High Risk
 # Yellow: Low Risk
@@ -19,6 +20,7 @@ line_thickness = 3
 db_push=True
 db_freq_frames=20
 viol_thresh_fl_fh=0.9
+
 def bird_eye_view(frame, pairs, bottom_points, scale_w, scale_h):
     h = frame.shape[0]
     w = frame.shape[1]
@@ -58,6 +60,8 @@ def social_distancing_view(frame, pairs, boxes, inversed_pts, heights,ids,all_vi
         vessel_area="wharf"
     else:
         vessel_area="hatch"
+
+    new_sload_prox = False
     for pair in pairs:
         i, j, dist, danger = pair
         xi, yi, wi, hi = boxes[i]
@@ -73,7 +77,7 @@ def social_distancing_view(frame, pairs, boxes, inversed_pts, heights,ids,all_vi
         pt = inversed_pts[j]
         obj_id=ids[j]
         if obj_id not in all_violations.keys():
-            violation_dict = {'first_frame_id':frame_id,'sload_last_pushed_frame_id':0,'sload_prox':False,'fall_fh':False,'fall_fh__last_pushed_frame_id':0}
+            violation_dict = {'first_frame_id':frame_id,'sload_last_pushed_frame_id':0,'sload_prox':False,'fall_fh':False,'fall_fh__last_pushed_frame_id':0, 'sload_prox_start_frame_id': 0, 'fall_fh_start_frame_id':0}
             all_violations[obj_id] = violation_dict
         #frame = cv2.circle(frame, (int(pt[0]), int(pt[1])), 5, yellow, 10)
         if danger:
@@ -83,6 +87,22 @@ def social_distancing_view(frame, pairs, boxes, inversed_pts, heights,ids,all_vi
             #frame = cv2.line(frame, proj_center, (int(xj+wj/2), int(yj+hj)), red, 2)
             risk_count += 1
             #violation_dict = {'first_frame_id':frame_id,'sload_last_pushed_frame_id':0,'sload_prox':True,'fall_fh':False,'fall_fh__last_pushed_frame_id':0}
+            
+            if all_violations[obj_id]['sload_prox'] == False:
+                if all_violations[obj_id]['sload_prox_start_frame_id'] == 0:
+                    new_sload_prox = True
+                    all_violations[obj_id]['sload_prox_start_frame_id'] = frame_id
+                else:
+                    time_period = (frame_id - all_violations[obj_id]['sload_prox_start_frame_id']) / fps
+                    if time_period > 60: # ignore new violation within 60s
+                        new_sload_prox = True
+                        all_violations[obj_id]['sload_prox_start_frame_id'] = frame_id
+            else:
+                time_period = (frame_id - all_violations[obj_id]['sload_prox_start_frame_id']) / fps
+                if time_period > 60: # consider 
+                    new_sload_prox = True
+                    all_violations[obj_id]['sload_prox_start_frame_id'] = frame_id
+
             all_violations[obj_id]['sload_prox'] = True
             #all_violations[obj_id]['fall_fh__last_pushed_frame_id']=frame_id
         else:
@@ -92,6 +112,8 @@ def social_distancing_view(frame, pairs, boxes, inversed_pts, heights,ids,all_vi
             all_violations[obj_id]['sload_prox'] = False
         """for pt in inversed_pts:
         frame = cv2.circle(frame, (int(pt[0]), int(pt[1])), 5, yellow, 10)"""
+
+        """
         if obj_id in all_violations.keys():
             viol_text = ''
             if all_violations[obj_id]['sload_prox'] == True :
@@ -108,6 +130,8 @@ def social_distancing_view(frame, pairs, boxes, inversed_pts, heights,ids,all_vi
                         viol='sload_prox',folder_timestamp=folder_timestamp,vid_save_path=vid_save_path,s_img_name=s_img_name):
                         
                         all_violations[obj_id]["sload_last_pushed_frame_id"] = frame_id
+        """
+
     new_size = (int(frame.shape[1]*constants.OUTPUT_RES_RATIO), int(frame.shape[0]*constants.OUTPUT_RES_RATIO))
     frame = cv2.resize(frame, new_size)
     
@@ -116,7 +140,7 @@ def social_distancing_view(frame, pairs, boxes, inversed_pts, heights,ids,all_vi
     # cv2.putText(pad, "-- RISK : " + str(risk_count) + " people", (50, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 1)
     # frame = np.vstack((frame,pad))
             
-    return frame,all_violations
+    return frame, new_sload_prox, all_violations
 
 def draw_danger_zones(img, reversed_danger_zones):
     for danger_zone in reversed_danger_zones:
@@ -201,6 +225,7 @@ def calculate_edge_to_person(roi_edge,frame, ori_shape, boxes,classes,frame_id, 
     risk_count = 0
     vessel_area="hatch"
     viol_thresh_fl_fh = thr_f_h
+    new_Fall_F_H = False
     #roi_edge = [self.reference_points[0],self.reference_points[1]]
     for i in range(len(boxes)):
         if classes[i]=='People':
@@ -232,7 +257,7 @@ def calculate_edge_to_person(roi_edge,frame, ori_shape, boxes,classes,frame_id, 
 
             obj_id=ids[i]
             if obj_id not in all_violations.keys():
-                violation_dict = {'first_frame_id':frame_id,'sload_last_pushed_frame_id':0,'sload_prox':False,'fall_fh':False,'fall_fh__last_pushed_frame_id':0}
+                violation_dict = {'first_frame_id':frame_id,'sload_last_pushed_frame_id':0,'sload_prox':False,'fall_fh':False,'fall_fh__last_pushed_frame_id':0, 'sload_prox_start_frame_id': 0, 'fall_fh_start_frame_id':0}
                 all_violations[obj_id] = violation_dict
             if round(float(distance),2)<viol_thresh_fl_fh:
                 #color = get_color(abs(obj_id))
@@ -240,11 +265,29 @@ def calculate_edge_to_person(roi_edge,frame, ori_shape, boxes,classes,frame_id, 
                 #frame=cv2.putText(frame, "Fall_F_H {}".format(round(float(distance),2)), (int(xj), int(yj)-10), cv2.FONT_HERSHEY_PLAIN, text_scale, (0, 0, 255),thickness=text_thickness)
                 frame=cv2.putText(frame, "Fall_F_H", (int(xj), int(yj)-10), cv2.FONT_HERSHEY_PLAIN, text_scale, (0, 0, 255),thickness=text_thickness)
                 #violation_dict = {'first_frame_id':frame_id,'sload_last_pushed_frame_id':0,'sload_prox':True,'fall_fh':False,'fall_fh__last_pushed_frame_id':0}
+                
+                if all_violations[obj_id]['fall_fh'] == False:
+                    if all_violations[obj_id]['fall_fh_start_frame_id'] == 0:
+                        new_Fall_F_H = True
+                        all_violations[obj_id]['fall_fh_start_frame_id'] = frame_id
+                    else:
+                        time_period = (frame_id - all_violations[obj_id]['fall_fh_start_frame_id']) / fps
+                        if time_period > 60: # ignore new violation within 60s
+                            new_Fall_F_H = True
+                            all_violations[obj_id]['fall_fh_start_frame_id'] = frame_id
+                else:
+                    time_period = (frame_id - all_violations[obj_id]['fall_fh_start_frame_id']) / fps
+                    if time_period > 60: 
+                        new_Fall_F_H = True
+                        all_violations[obj_id]['fall_fh_start_frame_id'] = frame_id
+
                 all_violations[obj_id]['fall_fh']= True
             else:
                 #frame=cv2.rectangle(frame,(int(xj),int(yj)),(int(xj+wj),int(yj+hj)), color=green, thickness=line_thickness)
                 #frame=cv2.putText(frame, "Fall_F_H {}".format(round(float(distance),2)), (int(xj), int(yj)-10), cv2.FONT_HERSHEY_PLAIN, text_scale, green,thickness=text_thickness)
                 all_violations[obj_id]['fall_fh']= False
+
+            """
             if obj_id in all_violations.keys():
                 viol_text = ''
                 if all_violations[obj_id]['fall_fh'] == True :
@@ -262,9 +305,10 @@ def calculate_edge_to_person(roi_edge,frame, ori_shape, boxes,classes,frame_id, 
                             viol='Fall_F_H',folder_timestamp=folder_timestamp,vid_save_path=vid_save_path,s_img_name=s_img_name):
                             all_violations[obj_id]["fall_fh__last_pushed_frame_id"] = frame_id
                             print("Fall from height pushed to db")
+            """
     new_size = (int(frame.shape[1]*constants.OUTPUT_RES_RATIO), int(frame.shape[0]*constants.OUTPUT_RES_RATIO))
     frame = cv2.resize(frame, new_size)
-    return frame,all_violations
+    return frame, new_Fall_F_H, all_violations
 def no_action(frame):
     new_size = (int(frame.shape[1]*constants.OUTPUT_RES_RATIO), int(frame.shape[0]*constants.OUTPUT_RES_RATIO))
     frame = cv2.resize(frame, new_size)
