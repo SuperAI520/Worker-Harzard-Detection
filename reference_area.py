@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import argparse
-
+  
 confid = 0.5
 thresh = 0.5
 mouse_pts = []                                                   
