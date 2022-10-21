@@ -41,6 +41,16 @@ def get_project_points(boxes, reference_points, classes, wharf):
             bottom_points.append(box)
     return bottom_points
 
+def get_project_points_wharf(boxes, land_Y, reference_points, classes):
+    bottom_points = []
+    for i, box in enumerate(boxes):
+        if classes[i] == 'Suspended Lean Object':
+                pnts = [int(box[0]+box[2]*0.5),land_Y]
+                bottom_points.append(pnts)
+        else:
+            bottom_points.append(box)
+    return bottom_points
+
 def get_center_points(boxes):
     centers = []
     for box in boxes:
@@ -290,6 +300,45 @@ def get_distances(boxes, reference_points, perspective_transform, inverse_perspe
             in_danger = is_inside_old(danger_zone, bottom_points[i], bottom_points[j]) if height_from_ground[i] >= danger_zone_height_threshold else False
             danger_zone_checks.append((i, j, None, in_danger)) 
     return danger_zone_checks, bottom_points, danger_zones, height_from_ground
+
+def get_danger_zones_wharf(boxes, wharf_landing_Y, reference_points, classes, old_classes, w, h, danger_zone_width_threshold, danger_zone_height_threshold):
+    danger_zones = []
+    danger_zone_checks = []
+    bottom_points = get_bottom_points(boxes, classes)
+    bottom_points = get_project_points_wharf(bottom_points, wharf_landing_Y, reference_points, classes)
+    center_points = get_center_points(boxes)
+    height_from_ground = [-1] * len(center_points)
+    for i, cls in enumerate(classes):
+        if cls == 'Suspended Lean Object':
+            bottom_points[i][1] = max(h/2, bottom_points[i][1])
+            bottom_points[i][1] = min(h, bottom_points[i][1])
+            bottom_points[i][0] = max(0, bottom_points[i][0])
+            bottom_points[i][0] = min(w, bottom_points[i][0])
+            height_from_ground[i] = wharf_landing_Y - (boxes[i][1] + boxes[i][3]/2)
+
+    for i in range(len(bottom_points)):
+        if classes[i] != 'Suspended Lean Object':
+            continue
+        danger_zone = None
+        if height_from_ground[i] >= danger_zone_height_threshold:
+            danger_zone = [boxes[i][0], boxes[i][1], boxes[i][0] + boxes[i][2], boxes[i][1] + boxes[i][3]]
+        for j in range(len(bottom_points)):
+            if classes[j] != 'People':
+                continue
+            in_danger = is_inside_old(danger_zone, bottom_points[i], bottom_points[j]) if height_from_ground[i] >= danger_zone_height_threshold else False
+            danger_zone_checks.append((i, j, None, in_danger)) 
+
+        if danger_zone is not None:
+            left_top = [danger_zone[0], danger_zone[1]]
+            left_bottom = [danger_zone[0], danger_zone[3]]
+            right_top = [danger_zone[2], danger_zone[1]]
+            right_bottom = [danger_zone[2], danger_zone[3]]
+            danger_zones.append([left_top, left_bottom, right_bottom, right_top])
+
+    return danger_zone_checks, bottom_points, danger_zones, height_from_ground
+
+
+
 
 def calculate_danger_zone_coordinates(old_class, box, center_pt, reference_points, distance_w, distance_h, w, h, width_threshold, wharf):
     # box_w, box_h = box[2:]

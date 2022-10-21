@@ -8,6 +8,7 @@ import collections
 
 TRACK_LIMIT_TIME = 1.5
 MOVEMENT_THR = 50
+WHARF_TRACKING_CYCLE = 3
 
 class CargoTracker:
     def __init__(self, wharf, fps, h, w):
@@ -20,6 +21,8 @@ class CargoTracker:
         self.height = h
         self.width = w
         self.step = 0 # 0: not process 1: ready to detect first cargo detection 2: in process 3: end process
+        self.wharf_landing_Y = []
+        self.wharf_tracking_cycles = WHARF_TRACKING_CYCLE
 
     def clear(self):
         self.distances_array.clear()
@@ -27,6 +30,9 @@ class CargoTracker:
         self.accumulated_cargo_ids.clear()
         self.ignore_cargo_ids.clear()
         self.step = 1
+        self.wharf_landing_Y.clear()
+        self.wharf_tracking_cycles = WHARF_TRACKING_CYCLE
+
     
     def set_step(self, step):
         self.step = step
@@ -59,7 +65,17 @@ class CargoTracker:
 
         return False, work_area_index
 
-    def track(self, work_area_index, ids, classes, bboxes, center_points):
+    def get_wharf_landing_Y(self):
+        sum_Y = 0
+        if len(self.wharf_landing_Y) == 0:
+            return 0
+
+        for pair in self.wharf_landing_Y:
+            sum_Y += pair[1]
+        landing_Y = int(math.floor(sum_Y / len(self.wharf_landing_Y)))
+        return landing_Y
+
+    def track(self, work_area_index, ids, classes, bboxes, center_points, workspaces):
         success = False
         if self.step == 1:
             self.step = 2
@@ -76,10 +92,18 @@ class CargoTracker:
                         continue
 
                     current_cargo_ids.append(ids[k])
-                    center_point = (int(bboxes[k][0] + bboxes[k][2] / 2), int(bboxes[k][1] + bboxes[k][3] / 2))
+                    if not self.wharf:
+                        center_point = (int(bboxes[k][0] + bboxes[k][2] / 2), int(bboxes[k][1] + bboxes[k][3] / 2))
+                    else:
+                        center_point = (int(bboxes[k][0] + bboxes[k][2] / 2), int(bboxes[k][1] + bboxes[k][3]))
+
                     distances = []
-                    for pt in center_points:
-                        dist = math.hypot(center_point[0]-pt[0], center_point[1]-pt[1])
+                    if not self.wharf:
+                        for pt in center_points:
+                            dist = math.hypot(center_point[0]-pt[0], center_point[1]-pt[1])
+                            distances.append(int(dist))
+                    else:
+                        dist = math.hypot(0, center_point[1]-0)
                         distances.append(int(dist))
 
                     for n in range(len(self.accumulated_cargo_ids)):
@@ -88,6 +112,12 @@ class CargoTracker:
                             self.cargos_pos[n].append(center_point)
 
                     if not ids[k] in self.accumulated_cargo_ids:
+                        if self.wharf and len(workspaces) > 0:
+                            inside = cv2.pointPolygonTest(workspaces[0], center_point, False)
+                            if inside >= 0:
+                                self.ignore_cargo_ids.append(ids[k])
+                                continue
+
                         self.accumulated_cargo_ids.append(ids[k])
                         self.distances_array.append([distances])
                         self.cargos_pos.append([center_point])
@@ -96,35 +126,69 @@ class CargoTracker:
                 delete_idxs = []
                 for n in range(len(self.accumulated_cargo_ids)):
                     if self.accumulated_cargo_ids[n] not in current_cargo_ids:
-                        print(f'--------->>   Processing {self.accumulated_cargo_ids[n]} movement')
+                        # print(f'--------->>   Processing {self.accumulated_cargo_ids[n]} movement')
                         if len(self.cargos_pos[n]) < self.fps * TRACK_LIMIT_TIME: # At least 3 seconds must be tracked cargo.
-                            print(f'XXXXXXXX  invalid short movement   id: {self.accumulated_cargo_ids[n]}')
+                            # print(f'XXXXXXXX  invalid short movement   id: {self.accumulated_cargo_ids[n]}')
                             # delete_idxs.append(n)
                             continue
 
                         init_pos, last_pos = self.cargos_pos[n][0], self.cargos_pos[n][-1]
                         print(last_pos, init_pos)
                         diff_pos = (last_pos[0] - init_pos[0], last_pos[1] - init_pos[1])
-                        if diff_pos[1] > 0 or abs(diff_pos[1]) < MOVEMENT_THR: # Process only unloading cargos and there should be a Y-axis movement.
-                            print(f'XXXXXXXX  invalid unloading movement   id: {self.accumulated_cargo_ids[n]}')
-                            delete_idxs.append(n)
-                            continue
+                        if not self.wharf:
+                            if diff_pos[1] > 0 or abs(diff_pos[1]) < MOVEMENT_THR: # Process only unloading cargos and there should be a Y-axis movement.
+                                print(f'XXXXXXXX  invalid unloading movement   id: {self.accumulated_cargo_ids[n]}')
+                                delete_idxs.append(n)
+                                continue
 
-                        min_value = min(self.distances_array[n][0])
-                        print(self.distances_array[n][0])
-                        min_index = self.distances_array[n][0].index(min_value)
-                        work_area_index = min_index
-                        success = True
+                            min_value = min(self.distances_array[n][0])
+                            print(self.distances_array[n][0])
+                            min_index = self.distances_array[n][0].index(min_value)
+                            work_area_index = min_index
+                            success = True
+                            self.step = 3
+                            
+                            print(f'********** 2 ***********   unloaded cargo {self.accumulated_cargo_ids[n]} started from {min_index}st workarea')
+                        else:
+                            if diff_pos[1] < 0 or abs(diff_pos[1]) < 50: # Process only unloading cargos and there should be a Y-axis movement.
+                                print(f'XXXXXXXX  invalid loading movement   id: {self.accumulated_cargo_ids[n]}')
+                                delete_idxs.append(n)
+                                continue
+                            if len(workspaces) > 0:
+                                inside = cv2.pointPolygonTest(workspaces[0], last_pos, False)
+                                if inside < 0:
+                                    print('$$$$$$$$$$$$$$$$$$$$$$$$$   out of workspace')
+                                    delete_idxs.append(n)
+                                    continue
+                            print(f'********** 2 ***********   loaded cargo {self.accumulated_cargo_ids[n]} to ({last_pos})')
+                            if self.wharf_tracking_cycles > 0:
+                                flag = False
+                                for z, iid_y in enumerate(self.wharf_landing_Y):
+                                    if iid_y[0] == self.accumulated_cargo_ids[n]:
+                                        self.wharf_landing_Y[z][1] = last_pos[1]
+                                        flag = True
+                                        break
+
+                                if not flag:
+                                    self.wharf_landing_Y.append([self.accumulated_cargo_ids[n], last_pos[1]])
+                                    self.wharf_tracking_cycles -= 1
+                            else:
+                                print('###########################   END tracking')
+                                self.step = 3
+
+                            self.distances_array.clear()
+                            self.cargos_pos.clear()
+                            self.accumulated_cargo_ids.clear()
+                            self.ignore_cargo_ids.clear()
+                            break
+                            
                         
-                        print(f'********** 2 ***********   unloaded cargo {self.accumulated_cargo_ids[n]} started from {min_index}st workarea')
-                        print(center_points)
-                        self.step = 3
                         
                 print(f'delete ids {delete_idxs}')
                 self.accumulated_cargo_ids = [c for j, c in enumerate(self.accumulated_cargo_ids) if j not in delete_idxs]
                 self.cargos_pos = [c for j, c in enumerate(self.cargos_pos) if j not in delete_idxs]
                 self.distances_array = [c for j, c in enumerate(self.distances_array) if j not in delete_idxs]
 
-            print(self.accumulated_cargo_ids, current_cargo_ids)
+            print(self.accumulated_cargo_ids, current_cargo_ids, self.wharf_landing_Y)
             
         return success, work_area_index

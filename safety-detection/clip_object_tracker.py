@@ -64,7 +64,7 @@ def is_inside(point, box):
         return point[0] >= x and point[0] <= x+w and point[1] >= y and point[1] <= y+h
 
 def update_tracks(work_area_index, tracker, im0, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, angle, distance_check, wharf, no_action, no_nested):
-    if no_action and work_area_index != -1:
+    if (no_action and not wharf) and work_area_index != -1:
         return [], [], [],[],[]
     
     max_distances = {
@@ -113,11 +113,11 @@ def update_tracks(work_area_index, tracker, im0, width, height, ignored_classes,
         if classes[i] in ['Suspended Lean Object', 'People', 'chain'] + ignored_classes:
             continue
         side_limit_check = True
-        if wharf:
-            if angle == 'left':
-                side_limit_check = (x + w <= suspended_threshold_wharf_side)
-            elif angle == 'right':
-                side_limit_check = (x >= suspended_threshold_wharf_side)
+        # if wharf:
+        #     if angle == 'left':
+        #         side_limit_check = (x + w <= suspended_threshold_wharf_side)
+        #     elif angle == 'right':
+        #         side_limit_check = (x >= suspended_threshold_wharf_side)
         if y + h <= suspended_threshold and side_limit_check:
             if h / height >= 0.08:
                 classes[i] = 'Suspended Lean Object'
@@ -239,7 +239,7 @@ def update_tracks(work_area_index, tracker, im0, width, height, ignored_classes,
                     classes[i] = 'far object'
             except:
                 continue
-
+    
     for i, box in enumerate(boxes):
         class_name = classes[i]
         detection = detections[i]
@@ -249,7 +249,7 @@ def update_tracks(work_area_index, tracker, im0, width, height, ignored_classes,
             xyxy = xywh2xyxy(box)
             original_label = f'{detection} #{track_id}'
             label = f'{original_label} {cur_distance} CM' if distance_check else original_label
-            # plot_one_box(xyxy, im0, label=label,color=get_color_for(original_label), line_thickness=3)
+            plot_one_box(xyxy, im0, label=label,color=get_color_for(original_label), line_thickness=3)
     return boxes, classes, old_classes, distance_estimations,ids
 
 def get_color_for(class_num):
@@ -365,7 +365,7 @@ def detect(opt):
     engine = Yolor() if constants.USE_YOLOR_MODEL else Yolov5_IV() if constants.USE_IV_MODEL else Yolov5()
     global names
     names = engine.get_names()
-    workspace_detector = DetectWorkspace()
+    workspace_detector = DetectWorkspace(opt.wharf)
 
     # initialize tracker
     tracker = Tracker(metric)
@@ -403,9 +403,10 @@ def detect(opt):
     # initialize cargo tracker
     work_area_index = -1
     cargo_tracker = CargoTracker(opt.wharf, fps, height, width)
+    wharf_landing_Y = -1
 
     suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = 0, 0, 0
-    workspaces, height_edges = [], []
+    workspaces, workspace_contours = [], []
     print('Safety zone detection starts...')
     # cv2.namedWindow("output", cv2.WINDOW_NORMAL)  
     while True:
@@ -418,12 +419,12 @@ def detect(opt):
 
         c0 = time.time()
         if frame_count == 0:
-            distance_tracker = DistanceTracker(frame, opt.source, height, width, fps, ignored_classes, opt.danger_zone_width_threshold, opt.danger_zone_height_threshold, workspaces, height_edges, opt.wharf, opt.angle, save_dir)
+            distance_tracker = DistanceTracker(frame, opt.source, height, width, fps, ignored_classes, opt.danger_zone_width_threshold, opt.danger_zone_height_threshold, workspaces, workspace_contours, opt.wharf, opt.angle, save_dir)
 
         if (frame_count / fps) % 300 == 0 or len(workspaces) == 0: # detect work area once every 5 mins
             cargo_tracker.clear()
 
-            workspaces, center_points, height_edges = workspace_detector.detect_workspace(frame)
+            workspaces, center_points, workspace_contours = workspace_detector.segment_workspace(frame)
             if len(workspaces) == 0:
                 frame_count = frame_count+1
                 if frame_count == frames:
@@ -437,20 +438,29 @@ def detect(opt):
             if len(workspaces) == 1:
                 print(f'*********************   only 1 work area')
                 work_area_index = 0
-                cargo_tracker.set_step(3)
+                if not opt.wharf:
+                    cargo_tracker.set_step(3)
                 distance_tracker.update_workarea(workspaces[work_area_index])
                 distance_tracker.calibrate_reference_area('')
                 suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
 
-            distance_tracker.update_edgepoints(height_edges)
+            distance_tracker.update_edgepoints(workspace_contours)
 
-        cv2.drawContours(frame, height_edges, -1, (0, 0, 255), 5)
+        cv2.drawContours(frame, workspace_contours, -1, (0, 0, 255), 5)
+        
+        if opt.wharf:
+            if cargo_tracker.get_wharf_landing_Y() > 0:
+                wharf_landing_Y = cargo_tracker.get_wharf_landing_Y()
+            if wharf_landing_Y > 0:
+                pt1 = (0, wharf_landing_Y)
+                pt2 = (width, wharf_landing_Y)
+                frame = cv2.line(frame, pt1, pt2, (0, 255, 0), 5)
 
         detection = get_detection_frame_yolor(frame, engine)
         c1 = time.time()
         inf_1 = int((c1-c0) *1000)
 
-        if work_area_index != -1:
+        if work_area_index != -1 and not opt.wharf:
             if calibrated_frames < 10:
                 if calibrated_frames == 0:
                     distance_tracker.clear_calibration_count()
@@ -513,7 +523,7 @@ def detect(opt):
                 #print("length of ids {}".format(len(ids)))
                 
                 # track unloading cargo and detect main work area from candidates
-                result, work_area_index = cargo_tracker.track(work_area_index, ids, classes, bboxes, center_points)
+                result, work_area_index = cargo_tracker.track(work_area_index, ids, classes, bboxes, center_points, workspaces)
                 if result:
                     distance_tracker.update_workarea(workspaces[work_area_index])
                     distance_tracker.calibrate_reference_area('')
@@ -523,7 +533,7 @@ def detect(opt):
                 inf_4 = int((c4-c3) *1000)
 
                 # update distance tracker
-                distance_tracker.calculate_distance(work_area_index, bboxes, classes, old_classes, distance_estimations, frame, frame_count,ids, opt.thr_f_h, db_manager)
+                distance_tracker.calculate_distance(work_area_index, bboxes, classes, old_classes, distance_estimations, frame, frame_count,ids, opt.thr_f_h, wharf_landing_Y, db_manager)
                 # Print time (inference + NMS)
                 c5 = time.time()
                 inf_5 = int((c5-c4) *1000)

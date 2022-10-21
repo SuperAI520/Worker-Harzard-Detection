@@ -8,48 +8,19 @@ import constants
 import math
 
 class DetectWorkspace:
-    def __init__(self):
+    def __init__(self, wharf):
         self.config = constants.SEGMENTATION_CONFIG_PATH
-        self.checkpoint = constants.SEGMENTATION_MODEL_PATH
+        self.wharf = wharf
+        if self.wharf == True:
+            self.checkpoint = constants.SEGMENTATION_WHARF_MODEL_PATH
+        else:
+            self.checkpoint = constants.SEGMENTATION_MODEL_PATH
         self.model = init_segmentor(self.config, self.checkpoint, device="cuda:0")
-    def detect_workspace(self, frame):
-        frame_count = 0
-        direction = 0
-        
-        workspaces = []
-        center_points = []
-        height_edges = []
-        if frame is None:
-            return None, None
-        
-        result = inference_segmentor(self.model, frame)
-        seg = result[0]
-        color_seg = np.zeros((seg.shape[0], seg.shape[1], 3), dtype=np.uint8)
-        min_size = int(min(seg.shape[0], seg.shape[1]) / 10)
-        color_seg[seg == 1, :] = [255, 0, 0]
-        # mmcv.imwrite(color_seg, "out.png")
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (min_size,min_size))
-        # color_seg = cv2.morphologyEx(color_seg, cv2.MORPH_OPEN, kernel)	
-        color_seg = cv2.cvtColor(color_seg, cv2.COLOR_BGR2GRAY)
-        cnts, hiers = cv2.findContours(color_seg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        # eliminate too small cargo areas
-        area_max = 0
-        area_array = []
-        new_cnts = []
-        for cnt in cnts:
-            area = cv2.contourArea(cnt)
-            area_array.append(area)
-            if (area_max < area):
-                area_max = area
 
-        thr_area = area_max // 5
-        print(area_array, thr_area)
-        for i, cnt in enumerate(cnts):
-            if area_array[i] > thr_area:
-                new_cnts.append(cnt)
+    def detect_workspace_rect_hatch(self, cnts):
+        workspace_rects = []
         
-        for cnt in new_cnts:
+        for cnt in cnts:
             hull = cv2.convexHull(cnt)
             
             rect = cv2.minAreaRect(hull)
@@ -241,10 +212,60 @@ class DetectWorkspace:
                     ordered_box = ordered_box2
             # print(f'  iou1 > iou2 {iou1 > iou2}')
 
-            workspaces.append(ordered_box)
+            workspace_rects.append(ordered_box)
 
+        return workspace_rects, center_points
 
-        edge_pts = []
+    def segment_workspace(self, frame):
+        frame_count = 0
+        direction = 0
+        
+        workspace_rects = []
+        center_points = []
+        workspace_contours = []
+        if frame is None:
+            return None, None
+
+        result = inference_segmentor(self.model, frame)
+        
+        seg = result[0]
+        color_seg = np.zeros((seg.shape[0], seg.shape[1], 3), dtype=np.uint8)
+        min_size = int(min(seg.shape[0], seg.shape[1]) / 10)
+        color_seg[seg == 1, :] = [255, 0, 0]
+        # mmcv.imwrite(color_seg, "out.png")
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (min_size,min_size))
+        # color_seg = cv2.morphologyEx(color_seg, cv2.MORPH_OPEN, kernel)	
+        color_seg = cv2.cvtColor(color_seg, cv2.COLOR_BGR2GRAY)
+        cnts, hiers = cv2.findContours(color_seg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        area_max = 0
+        new_cnts = []
+        if not self.wharf:
+            # eliminate too small cargo areas
+            area_array = []
+            for cnt in cnts:
+                area = cv2.contourArea(cnt)
+                area_array.append(area)
+                if (area_max < area):
+                    area_max = area
+
+            thr_area = area_max // 5
+            for i, cnt in enumerate(cnts):
+                if area_array[i] > thr_area:
+                    new_cnts.append(cnt)
+
+            workspace_rects, center_points = self.detect_workspace_rect_hatch(new_cnts)
+        else:
+            #Find biggest contour
+            biggest_cnt = []
+            for cnt in cnts:
+                area = cv2.contourArea(cnt)
+                if (area_max < area):
+                    area_max = area
+                    biggest_cnt = cnt 
+            new_cnts.append(biggest_cnt)
+
+        approx_cnts = []
         for cnt in new_cnts:
             num_of_edge = len(cnt)
             approx = cnt
@@ -255,11 +276,14 @@ class DetectWorkspace:
                 num_of_edge = len(approx)
                 rate += 0.0001
             cnt = approx
-            edge_pts.append(cnt)
+            approx_cnts.append(cnt)
             cv2.drawContours(color_seg, [cnt], -1, (0, 0, 255), 2)
 
-        height_edges = edge_pts
-        return workspaces, center_points, height_edges
+        workspace_contours = approx_cnts
+        if self.wharf:
+            workspace_rects = workspace_contours
+            
+        return workspace_rects, center_points, workspace_contours
 
 def order_points(pts):
     # sort the points based on their x-coordinates
