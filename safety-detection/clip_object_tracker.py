@@ -242,7 +242,7 @@ def update_tracks(work_area_index, workspaces, tracker, im0, width, height, igno
             xyxy = xywh2xyxy(box)
             original_label = f'{detection} #{track_id}'
             label = f'{original_label} {cur_distance} CM' if distance_check else original_label
-            plot_one_box(xyxy, im0, label=label,color=get_color_for(original_label), line_thickness=3)
+            # plot_one_box(xyxy, im0, label=label,color=get_color_for(original_label), line_thickness=3)
     return boxes, classes, old_classes, distance_estimations,ids
 
 def get_color_for(class_num):
@@ -440,8 +440,6 @@ def detect(opt):
                 suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
 
             distance_tracker.update_edgepoints(workspace_contours)
-
-        cv2.drawContours(frame, workspace_contours, -1, (0, 0, 255), 5)
         
         if opt.wharf:
             if cargo_tracker.get_wharf_landing_Y() > 0:
@@ -480,6 +478,8 @@ def detect(opt):
                 distance_tracker.calibrate_reference_area('')
                 suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
 
+        cv2.drawContours(frame, workspace_contours, -1, (0, 0, 255), 5)
+        
         for i, det in enumerate(pred): # detections per image
             bboxes = []
             classes = []
