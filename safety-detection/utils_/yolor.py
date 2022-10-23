@@ -90,7 +90,7 @@ class Yolor:
 
                 box_wo_pad = box_wo_pad.astype(int)
 
-                print(f'{s}  Done.')
+                # print(f'{s}  Done.')
                 for i, box in enumerate(box_wo_pad):
                     predictions_per_image.append(np.array([box[0], box[1], box[2], box[3], scores[i], labels[i]]))
                     label_index = labels[i].detach().numpy()

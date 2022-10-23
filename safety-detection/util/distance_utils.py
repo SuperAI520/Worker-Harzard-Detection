@@ -2,6 +2,7 @@
 import cv2
 import numpy as np
 import constants
+from shapely.geometry import Polygon
 
 UNIT_LENGTH = constants.UNIT_LENGTH
 DANGER_ZONE_DIAG = constants.DANGER_ZONE_DIAG
@@ -165,6 +166,11 @@ def is_inside_old_wharf(danger_zone, center, coord):
                             and coord[1] >= danger_zone[1][1] and coord[1] <= danger_zone[3][1]
     return inside_danger_zone
 
+def is_inside_old_wharf_alex(danger_zone, center, coord):
+    pts = np.array(danger_zone, np.int32)
+    inside = cv2.pointPolygonTest(pts, coord, False)
+    return inside >= 0
+
 # Function calculates distance between all pairs and calculates closeness ratio.
 def get_distances_hatch(boxes, reference_points, perspective_transform, inverse_perspective_transform, classes, distance_w, distance_h, w, h, danger_zone_width_threshold, danger_zone_height_threshold, average_human_height):
     wharf = False
@@ -321,19 +327,18 @@ def get_danger_zones_wharf(boxes, wharf_landing_Y, reference_points, classes, ol
             continue
         danger_zone = None
         if height_from_ground[i] >= danger_zone_height_threshold:
-            danger_zone = [boxes[i][0], boxes[i][1], boxes[i][0] + boxes[i][2], boxes[i][1] + boxes[i][3]]
+            left_top = [boxes[i][0] + boxes[i][2] / 4, wharf_landing_Y - boxes[i][3] / 4]
+            left_bottom = [boxes[i][0], wharf_landing_Y + boxes[i][3] / 4]
+            right_top = [boxes[i][0] + boxes[i][2] * 3 / 4, wharf_landing_Y - boxes[i][3] / 4]
+            right_bottom = [boxes[i][0] + boxes[i][2], wharf_landing_Y + boxes[i][3] / 4]
+            danger_zone = [left_top, left_bottom, right_bottom, right_top]
+            danger_zones.append(danger_zone)
+
         for j in range(len(bottom_points)):
             if classes[j] != 'People':
                 continue
-            in_danger = is_inside_old(danger_zone, bottom_points[i], bottom_points[j]) if height_from_ground[i] >= danger_zone_height_threshold else False
+            in_danger = is_inside_old_wharf_alex(danger_zone, bottom_points[i], bottom_points[j]) if height_from_ground[i] >= danger_zone_height_threshold else False
             danger_zone_checks.append((i, j, None, in_danger)) 
-
-        if danger_zone is not None:
-            left_top = [danger_zone[0], danger_zone[1]]
-            left_bottom = [danger_zone[0], danger_zone[3]]
-            right_top = [danger_zone[2], danger_zone[1]]
-            right_bottom = [danger_zone[2], danger_zone[3]]
-            danger_zones.append([left_top, left_bottom, right_bottom, right_top])
 
     return danger_zone_checks, bottom_points, danger_zones, height_from_ground
 

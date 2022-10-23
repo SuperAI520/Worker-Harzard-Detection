@@ -63,7 +63,7 @@ def is_inside(point, box):
         x, y, w, h = box
         return point[0] >= x and point[0] <= x+w and point[1] >= y and point[1] <= y+h
 
-def update_tracks(work_area_index, tracker, im0, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, angle, distance_check, wharf, no_action, no_nested):
+def update_tracks(work_area_index, workspaces, tracker, im0, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, angle, distance_check, wharf, no_action, no_nested):
     if (no_action and not wharf) and work_area_index != -1:
         return [], [], [],[],[]
     
@@ -112,22 +112,15 @@ def update_tracks(work_area_index, tracker, im0, width, height, ignored_classes,
             
         if classes[i] in ['Suspended Lean Object', 'People', 'chain'] + ignored_classes:
             continue
-        side_limit_check = True
-        # if wharf:
-        #     if angle == 'left':
-        #         side_limit_check = (x + w <= suspended_threshold_wharf_side)
-        #     elif angle == 'right':
-        #         side_limit_check = (x >= suspended_threshold_wharf_side)
-        if y + h <= suspended_threshold and side_limit_check:
-            if h / height >= 0.08:
+            
+        if not wharf:
+            if y + h <= suspended_threshold:
+                if h / height >= 0.08:
+                    classes[i] = 'Suspended Lean Object'
+        else: # consider only "Forklift","HumanCarrier" outside the ground as 'Suspended Lean Object' so that they can take part in danager area detection
+            inside = cv2.pointPolygonTest(workspaces[0], [x + w/2, y + h], False)
+            if inside < 0 and h / height >= 0.08:
                 classes[i] = 'Suspended Lean Object'
-            """for j, chain_candidate in enumerate(boxes):
-                if not classes[j] == 'chain':
-                    continue
-                x_chain, y_chain, w_chain, h_chain = chain_candidate
-                if x_chain >= x and x_chain <= x+w: # center of the chain is aligned with the bbox
-                    if (y - (y_chain + h_chain)) / height <= 0.1: # y-axis check for bottom of chain and top of object bbox
-                        classes[i] = 'suspended lean object'"""
     
     for i in range(len(boxes)):
         class_name = classes[i]
@@ -404,6 +397,8 @@ def detect(opt):
     work_area_index = -1
     cargo_tracker = CargoTracker(opt.wharf, fps, height, width)
     wharf_landing_Y = -1
+    cargo_ids = []
+
 
     suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = 0, 0, 0
     workspaces, workspace_contours = [], []
@@ -454,7 +449,7 @@ def detect(opt):
             if wharf_landing_Y > 0:
                 pt1 = (0, wharf_landing_Y)
                 pt2 = (width, wharf_landing_Y)
-                frame = cv2.line(frame, pt1, pt2, (0, 255, 0), 5)
+                # frame = cv2.line(frame, pt1, pt2, (0, 255, 0), 5)
 
         detection = get_detection_frame_yolor(frame, engine)
         c1 = time.time()
@@ -518,7 +513,7 @@ def detect(opt):
                 tracker.update(detections)
 
                 # update tracks
-                bboxes, classes, old_classes, distance_estimations,ids = update_tracks(work_area_index, tracker, frame, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, opt.angle, opt.distance_check, opt.wharf, not hasattr(distance_tracker, 'distance_w'), opt.no_nested)
+                bboxes, classes, old_classes, distance_estimations,ids = update_tracks(work_area_index, workspaces, tracker, frame, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, opt.angle, opt.distance_check, opt.wharf, not hasattr(distance_tracker, 'distance_w'), opt.no_nested)
                 #print("length of bboxes {}".format(bboxes))
                 #print("length of ids {}".format(len(ids)))
                 
@@ -543,7 +538,7 @@ def detect(opt):
             break
 
         elapsed_time = int((time.time()-c0)*1000)
-        print(f'\t\t\t elapsed time {elapsed_time}: {inf_1}, {inf_2}, {inf_3}, {inf_4}, {inf_5}')
+        # print(f'\t\t\t elapsed time {elapsed_time}: {inf_1}, {inf_2}, {inf_3}, {inf_4}, {inf_5}')
         # Display the resulting frame
         # cv2.imshow("output", frame)
         

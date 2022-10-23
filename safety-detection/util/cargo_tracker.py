@@ -9,6 +9,7 @@ import collections
 TRACK_LIMIT_TIME = 1.5
 MOVEMENT_THR = 50
 WHARF_TRACKING_CYCLE = 3
+TOLERANCE_DIS = -50
 
 class CargoTracker:
     def __init__(self, wharf, fps, h, w):
@@ -103,8 +104,9 @@ class CargoTracker:
                             dist = math.hypot(center_point[0]-pt[0], center_point[1]-pt[1])
                             distances.append(int(dist))
                     else:
-                        dist = math.hypot(0, center_point[1]-0)
-                        distances.append(int(dist))
+                        # dist = math.hypot(0, center_point[1]-0)
+                        # distances.append(int(dist))
+                        distances.append(bboxes[k][3]) # save height of cargo rect in wharf case
 
                     for n in range(len(self.accumulated_cargo_ids)):
                         if ids[k] == self.accumulated_cargo_ids[n]:
@@ -112,7 +114,7 @@ class CargoTracker:
                             self.cargos_pos[n].append(center_point)
 
                     if not ids[k] in self.accumulated_cargo_ids:
-                        if self.wharf and len(workspaces) > 0:
+                        if self.wharf and len(workspaces) > 0: # ignore new cargo inside the ground from tracking.
                             inside = cv2.pointPolygonTest(workspaces[0], center_point, False)
                             if inside >= 0:
                                 self.ignore_cargo_ids.append(ids[k])
@@ -154,25 +156,30 @@ class CargoTracker:
                                 print(f'XXXXXXXX  invalid loading movement   id: {self.accumulated_cargo_ids[n]}')
                                 delete_idxs.append(n)
                                 continue
+                            offset = 0
+                            TOLERANCE_DIS = (-1) * self.distances_array[n][-1][0] / 2
                             if len(workspaces) > 0:
-                                inside = cv2.pointPolygonTest(workspaces[0], last_pos, False)
-                                if inside < 0:
-                                    print('$$$$$$$$$$$$$$$$$$$$$$$$$   out of workspace')
-                                    delete_idxs.append(n)
-                                    continue
-                            print(f'********** 2 ***********   loaded cargo {self.accumulated_cargo_ids[n]} to ({last_pos})')
-                            if self.wharf_tracking_cycles > 0:
-                                flag = False
-                                for z, iid_y in enumerate(self.wharf_landing_Y):
-                                    if iid_y[0] == self.accumulated_cargo_ids[n]:
-                                        self.wharf_landing_Y[z][1] = last_pos[1]
-                                        flag = True
-                                        break
+                                inside = cv2.pointPolygonTest(workspaces[0], last_pos, True)
+                                # if inside < TOLERANCE_DIS:
+                                #     print(f'$$$$$$$$$$$$$$$$$$$$$$$$$   out of workspace {inside}')
+                                #     delete_idxs.append(n)
+                                #     continue
 
-                                if not flag:
-                                    self.wharf_landing_Y.append([self.accumulated_cargo_ids[n], last_pos[1]])
-                                    self.wharf_tracking_cycles -= 1
-                            else:
+                                offset = (abs(inside) + self.distances_array[n][-1][0] / 4) if inside < 0 else 0 
+                            print(f'********** 2 ***********   loaded cargo {self.accumulated_cargo_ids[n]} to ({last_pos})')
+                            
+                            flag = False
+                            for z, iid_y in enumerate(self.wharf_landing_Y):
+                                if iid_y[0] == self.accumulated_cargo_ids[n]:
+                                    self.wharf_landing_Y[z][1] = last_pos[1] + offset
+                                    flag = True
+                                    break
+
+                            if not flag:
+                                self.wharf_landing_Y.append([self.accumulated_cargo_ids[n], last_pos[1] + offset])
+                                self.wharf_tracking_cycles -= 1
+                            
+                            if self.wharf_tracking_cycles == 0:
                                 print('###########################   END tracking')
                                 self.step = 3
 
@@ -184,7 +191,7 @@ class CargoTracker:
                             
                         
                         
-                print(f'delete ids {delete_idxs}')
+                # print(f'delete ids {delete_idxs}')
                 self.accumulated_cargo_ids = [c for j, c in enumerate(self.accumulated_cargo_ids) if j not in delete_idxs]
                 self.cargos_pos = [c for j, c in enumerate(self.cargos_pos) if j not in delete_idxs]
                 self.distances_array = [c for j, c in enumerate(self.distances_array) if j not in delete_idxs]
