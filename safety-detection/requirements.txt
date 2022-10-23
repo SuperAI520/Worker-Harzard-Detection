@@ -30,3 +30,6 @@ Shapely==1.8.4
 # clip
 ftfy==6.1.1
 regex==2022.8.17
+
+boto3==1.24.96
+loguru==0.6.0

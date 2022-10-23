@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
 		ffmpeg libsm6 libxext6 \
 		&& apt-get install gcc -y 
 
-RUN pip install -r /install/requirements.txt
+RUN python -m pip install -r /install/requirements.txt
 
 RUN MMCV_WITH_OPS=1 mim install mmcv-full
 
