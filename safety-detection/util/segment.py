@@ -17,8 +17,10 @@ class DetectWorkspace:
             self.checkpoint = constants.SEGMENTATION_MODEL_PATH
         self.model = init_segmentor(self.config, self.checkpoint, device="cuda:0")
 
-    def detect_workspace_rect_hatch(self, cnts):
+    def detect_workspace_rect_hatch(self, frame, cnts):
         workspace_rects = []
+        center_points = []
+        direction = 0
         
         for cnt in cnts:
             hull = cv2.convexHull(cnt)
@@ -218,7 +220,6 @@ class DetectWorkspace:
 
     def segment_workspace(self, frame):
         frame_count = 0
-        direction = 0
         
         workspace_rects = []
         center_points = []
@@ -254,7 +255,7 @@ class DetectWorkspace:
                 if area_array[i] > thr_area:
                     new_cnts.append(cnt)
 
-            workspace_rects, center_points = self.detect_workspace_rect_hatch(new_cnts)
+            workspace_rects, center_points = self.detect_workspace_rect_hatch(frame, new_cnts)
         else:
             #Find biggest contour
             biggest_cnt = []
