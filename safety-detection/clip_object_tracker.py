@@ -414,7 +414,7 @@ def detect(opt):
 
         c0 = time.time()
         if frame_count == 0:
-            distance_tracker = DistanceTracker(frame, opt.source, height, width, fps, ignored_classes, opt.danger_zone_width_threshold, opt.danger_zone_height_threshold, workspaces, workspace_contours, opt.wharf, opt.angle, save_dir)
+            distance_tracker = DistanceTracker(frame, opt.source, height, width, fps, ignored_classes, opt.danger_zone_width_threshold, opt.danger_zone_height_threshold, workspaces, workspace_contours, opt.wharf, opt.angle, save_dir, opt.save_result)
 
         if (frame_count / fps) % 300 == 0 or len(workspaces) == 0: # detect work area once every 5 mins
             cargo_tracker.clear()
@@ -554,6 +554,7 @@ if __name__ == '__main__':
     parser.add_argument('--budget', type=float, default=-1.0)
     parser.add_argument('--source', required=True)
     parser.add_argument('--wharf', action='store_true')
+    parser.add_argument('--save_result', action='store_true')
     parser.add_argument('--angle', choices=['left', 'right'], default='left')
     parser.add_argument('--no_nested', action='store_true')
     parser.add_argument('--distance_check', action='store_true')

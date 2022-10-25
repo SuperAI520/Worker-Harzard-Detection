@@ -19,8 +19,8 @@ pandas>=1.1.4
 seaborn>=0.11.0
 
 # if for not docker, these have to be unlocked.
-torch>=1.7.0
-torchvision>=0.8.1
+torch==1.9.1+cu111
+torchvision==0.10.1+cu111
 
 fastai==2.7.9
 openmim==0.2.1

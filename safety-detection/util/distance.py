@@ -13,21 +13,22 @@ import threading
 from util.db_manager import s3_sqs_handler, handle_annot_frames_buffer
 
 class DistanceTracker:
-    def __init__(self, frame, source, height, width, fps, ignored_classes, danger_zone_width_threshold, danger_zone_height_threshold, work_area, height_edges, wharf,angle, output_dir):
+    def __init__(self, frame, source, height, width, fps, ignored_classes, danger_zone_width_threshold, danger_zone_height_threshold, work_area, height_edges, wharf,angle, output_dir, save_result):
         self.output_dir = output_dir
         # Get video height, width and fps
         self.height = height
         self.width = width
         self.angle = angle
+        self.save_result = save_result
         self.filename=source.split('/')[-1].split('.')[0]
         # self.edge_points = constants.EDGE_AREA_DICT[source.split('/')[-1]]
         self.edge_points = height_edges
         self.reference_points = work_area
         self.calibrate_reference_area(source.split('/')[-1])
         self.scale_w, self.scale_h = utills.get_scale(self.width, self.height)
-
-        fourcc = cv2.VideoWriter_fourcc(*"XVID")
-        self.output_movie = cv2.VideoWriter(f"{output_dir}/{source.split('/')[-1].split('.')[0]}_dist.avi", fourcc, fps, (int(self.width*constants.OUTPUT_RES_RATIO), int(self.height*constants.OUTPUT_RES_RATIO)))
+        if self.save_result:
+            fourcc = cv2.VideoWriter_fourcc(*"XVID")
+            self.output_movie = cv2.VideoWriter(f"{output_dir}/{source.split('/')[-1].split('.')[0]}_dist.avi", fourcc, fps, (int(self.width*constants.OUTPUT_RES_RATIO), int(self.height*constants.OUTPUT_RES_RATIO)))
         self.calibrated_frames = 0
 
         self.ignored_classes = ignored_classes
@@ -214,9 +215,10 @@ class DistanceTracker:
             print("no action {} and {}".format(no_action,count))
             img = plot.no_action(frame)
         if count != 0:
-            self.output_movie.write(img)
+            if self.save_result:
+                self.output_movie.write(img)
             handle_annot_frames_buffer(frame=img,frame_id=count)
             # db_manager.record_update(img)
-        
-        if count == 0:
-            cv2.imwrite(f"{self.output_dir}/frame%d.jpg" % count, img)
+        if self.save_result:
+            if count == 0:
+                cv2.imwrite(f"{self.output_dir}/frame%d.jpg" % count, img)
