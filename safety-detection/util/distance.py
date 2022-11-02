@@ -81,26 +81,32 @@ class DistanceTracker:
         pts = np.float32(np.array([pts]))
         warped_pt = cv2.perspectiveTransform(pts, self.perspective_transform)[0]
         distance_h = 0
+        hatch_human_height = 0
         wharf_human_height = 0
         for i in range(n_people):
             top = warped_pt[2*i]
             bottom = warped_pt[2*i+1]
             distance_h += np.abs(bottom[1] - top[1])
+            hatch_human_height += np.abs(bboxes[i][3] - bboxes[i][1])
             wharf_human_height = max(np.abs(bboxes[i][3] - bboxes[i][1]), wharf_human_height)
         distance_h /= n_people
+        hatch_human_height /= n_people
         distance_w = distance_h
         if self.calibrated_frames == 0:
             self.distance_h = distance_h
             self.distance_w = distance_w
+            self.hatch_human_height = hatch_human_height
             self.wharf_human_height = wharf_human_height
             self.calibrated_frames += 1
         else:
             temp_h = self.distance_h * self.calibrated_frames + distance_h
             temp_w = self.distance_w * self.calibrated_frames + distance_w
+            temp_hatch_human_height = self.hatch_human_height * self.calibrated_frames + hatch_human_height
             temp_wharf_human_height = self.wharf_human_height * self.calibrated_frames + wharf_human_height
             self.calibrated_frames += 1
             self.distance_h = temp_h / self.calibrated_frames
             self.distance_w = temp_w / self.calibrated_frames
+            self.hatch_human_height = temp_hatch_human_height / self.calibrated_frames
             self.wharf_human_height = temp_wharf_human_height / self.calibrated_frames
     
     def clear_calibration_count(self):
@@ -109,6 +115,7 @@ class DistanceTracker:
             delattr(self, 'distance_w')
             delattr(self, 'distance_h')
             delattr(self, 'wharf_human_height')    
+            delattr(self, 'hatch_human_height')    
     
     def get_bboxes(self, tracker, names):
         boxes = []
@@ -193,6 +200,7 @@ class DistanceTracker:
 
                 roi_edge= self.edge_points
                 # print(roi_edge)
+                thr_f_h = self.hatch_human_height * 0.2 /100
                 img, new_Fall_F_H, self.all_violations=plot.calculate_edge_to_person(roi_edge,img, frame.shape, boxes, classes,count, thr_f_h, self.all_violations,ids,self.filename,self.fps)
                 #print(self.all_violations)
 
