@@ -2,6 +2,7 @@ import sys
 sys.path.insert(0, './yolor')
 import argparse
 import time
+from datetime import datetime
 from pathlib import Path
 from turtle import distance
 import glob
@@ -13,6 +14,7 @@ import cv2
 import torch
 import numpy as np
 import math
+import boto3
 
 # deep sort imports
 from deep_sort import preprocessing, nn_matching
@@ -63,6 +65,43 @@ def xywh2xyxy(xywh):
 def is_inside(point, box):
         x, y, w, h = box
         return point[0] >= x and point[0] <= x+w and point[1] >= y and point[1] <= y+h
+
+def get_kiesis_url(live=False):
+    live = False
+    # STREAM_NAME = 'https://ap-southeast-1.console.aws.amazon.com/kinesisvideo/home?region=ap-southest-1#/streams/streamName/jp_test2'
+    STREAM_NAME = 'jp_test5'
+    # STREAM_NAME = os.environ.get('kinesis_url')
+    kvs = boto3.client("kinesisvideo", )
+    # Grab the endpoint from GetDataEndpoint
+    endpoint = kvs.get_data_endpoint(
+        APIName="GET_HLS_STREAMING_SESSION_URL",
+        StreamName=STREAM_NAME
+        )['DataEndpoint']
+    
+    kvam = boto3.client("kinesis-video-archived-media", endpoint_url=endpoint)
+    if live:
+        url = kvam.get_hls_streaming_session_url(
+            StreamName=STREAM_NAME,
+            #PlaybackMode="ON_DEMAND",
+            PlaybackMode="LIVE",
+            Expires = int(12*3600)
+            )['HLSStreamingSessionURL']
+    else: 
+        url = kvam.get_hls_streaming_session_url(
+            StreamName=STREAM_NAME,
+            #PlaybackMode="ON_DEMAND",
+            PlaybackMode="LIVE_REPLAY",
+            HLSFragmentSelector={
+            'FragmentSelectorType': 'SERVER_TIMESTAMP',
+            'TimestampRange': {
+                'StartTimestamp': datetime(2022,11,1,2,10),
+                'EndTimestamp': datetime(2022,11,1,3,30)
+                }
+            },
+            Expires = int(12*3600)
+            )['HLSStreamingSessionURL']
+
+    return url
 
 def update_tracks(work_area_index, workspaces, tracker, im0, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, angle, distance_check, wharf, no_action, no_nested):
     if (no_action and not wharf) and work_area_index != -1:
@@ -375,6 +414,7 @@ def detect(opt):
     set_logging()      
 
     # init VideoCapture
+    # url = get_kiesis_url()
     cap = cv2.VideoCapture(source)
     vid_path, vid_writer = None, None
     if not cap.isOpened():
@@ -382,6 +422,7 @@ def detect(opt):
         exit()
 
     fps = int(cap.get(cv2.CAP_PROP_FPS))
+    # fps = 15
     frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     frames = frames if opt.budget == -1 else min(frames, int(fps*60*opt.budget))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))

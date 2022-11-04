@@ -13,4 +13,7 @@ class ThreadManager:
 			x.join()
 		print('all threads ended')
 
+	def count_threads(self):
+		return len(self.threads)
+
 thread_manager = ThreadManager()

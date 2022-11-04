@@ -89,6 +89,7 @@ def process_violation_video(local_video_fname,s3_filename,frame_id,viol_txt,viol
     # Keep on checking the video buffers
     while list(frames_id_buffer).index((frame_id%2000)) < (video_duration_in_s*fps):
         # logger.info(str(list(frames_id_buffer).index((frame_id%2000))))
+        time.sleep(1)
         continue
     frames_id_list_copy = list(frames_id_buffer)
     frames_list_copy = list(annot_frame_buffer)
