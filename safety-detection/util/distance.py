@@ -10,6 +10,7 @@ import constants
 import torch
 import torchvision.ops.boxes as bops
 import threading
+import util.threads as threads
 from util.db_manager import s3_sqs_handler, handle_annot_frames_buffer
 
 class DistanceTracker:
@@ -218,6 +219,7 @@ class DistanceTracker:
                 s3_sqs_thread = threading.Thread(target=s3_sqs_handler,args=(snap_path, snap_imgname,snap_imgname,viol_text,count,frame.shape[0],frame.shape[1], self.fps, True,))
                 s3_sqs_thread.daemon = True
                 s3_sqs_thread.start()
+                threads.thread_manager.add_thread(s3_sqs_thread)
         else:
             no_action+=1
             print("no action {} and {}".format(no_action,count))

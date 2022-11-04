@@ -24,6 +24,7 @@ from util.segment import DetectWorkspace
 from util.distance import DistanceTracker
 from util.cargo_tracker import CargoTracker
 from util.db_manager import DBManager
+import util.threads as threads
 
 import constants
 from utils_.yolor import Yolor
@@ -548,6 +549,7 @@ def detect(opt):
     # When everything done, release the capture
     cap.release()
     cv2.destroyAllWindows()
+    threads.thread_manager.join_threads()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

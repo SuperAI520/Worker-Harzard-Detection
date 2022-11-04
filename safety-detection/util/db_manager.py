@@ -12,6 +12,7 @@ import threading
 import multiprocessing
 from util.aws_utils import sqs_transfer
 from util.aws_utils import s3_transfer
+import util.threads as threads
 
 class DBManager:
 	def __init__(self, source, width, height, fps, output_dir):
@@ -114,4 +115,5 @@ def s3_sqs_handler(local_filepath, local_filename,s3_filename,viol_txt,frame_id,
         s3_video_thread = threading.Timer(video_duration_in_s*1.5,process_violation_video,args=(osp.join(local_filepath, (osp.splitext(local_filename)[0]+'.mp4')),(osp.splitext(s3_filename)[0]+'.mp4'),frame_id,viol_txt,violation_id,width,height,video_duration_in_s,fps))
         # s3_video_thread.daemon = True
         s3_video_thread.start()
+        threads.thread_manager.add_thread(s3_video_thread)
         # process_violation_video(local_video_fname=(osp.splitext(local_filename)[0]+'.mp4'),s3_filename=(osp.splitext(s3_filename)[0]+'.mp4'),frame_id=frame_id,viol_txt=viol_txt,violation_id=violation_id,width=width,height=height,video_duration_in_s=5)

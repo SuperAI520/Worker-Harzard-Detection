@@ -56,6 +56,7 @@ def social_distancing_view(frame, pairs, boxes, inversed_pts, heights,ids,all_vi
     vid_save_path=output_dir
     snap_path=output_dir
     risk_count = 0
+    thr_frames = fps * 1  # Threshold of frames at which the violation persists : 1s
     if wharf:
         vessel_area="wharf"
     else:
@@ -77,39 +78,34 @@ def social_distancing_view(frame, pairs, boxes, inversed_pts, heights,ids,all_vi
         pt = inversed_pts[j]
         obj_id=ids[j]
         if obj_id not in all_violations.keys():
-            violation_dict = {'first_frame_id':frame_id,'sload_last_pushed_frame_id':0,'sload_prox':False,'fall_fh':False,'fall_fh__last_pushed_frame_id':0, 'sload_prox_start_frame_id': 0, 'fall_fh_start_frame_id':0}
+            violation_dict = {'first_frame_id':frame_id,'sload_last_pushed_frame_id':0,'sload_prox':False,'fall_fh':False,'fall_fh__last_pushed_frame_id':0, 'sload_prox_start_frame_id': 0, 'sload_prox_frame_buffers': {'last_frame_id': 0, 'count': 0}, 'fall_fh_start_frame_id':0, 'fall_fh_frame_buffers':{'last_frame_id': 0, 'count': 0}}
             all_violations[obj_id] = violation_dict
         #frame = cv2.circle(frame, (int(pt[0]), int(pt[1])), 5, yellow, 10)
+        if all_violations[obj_id]['sload_prox_frame_buffers']['last_frame_id'] + 1 != frame_id:
+            all_violations[obj_id]['sload_prox_frame_buffers']['count'] = 0
+
         if danger:
+            all_violations[obj_id]['sload_prox_frame_buffers']['count'] += 1
+            all_violations[obj_id]['sload_prox_frame_buffers']['last_frame_id'] = frame_id
+        else:
+            all_violations[obj_id]['sload_prox_frame_buffers']['count'] = 0
+
+        if all_violations[obj_id]['sload_prox_frame_buffers']['count'] >= thr_frames:
             frame = cv2.rectangle(frame,(int(xj),int(yj)),(int(xj+wj),int(yj+hj)),red,2)
             frame=cv2.putText(frame, 'sload_prox', (int(xj), int(yj)-10), cv2.FONT_HERSHEY_PLAIN, text_scale,red,thickness=text_thickness) 
-            #frame = cv2.line(frame, proj_center, (int(xj+wj/2), int(yj+hj/2)), red, 2)
-            #frame = cv2.line(frame, proj_center, (int(xj+wj/2), int(yj+hj)), red, 2)
-            risk_count += 1
-            #violation_dict = {'first_frame_id':frame_id,'sload_last_pushed_frame_id':0,'sload_prox':True,'fall_fh':False,'fall_fh__last_pushed_frame_id':0}
-            
-            if all_violations[obj_id]['sload_prox'] == False:
-                if all_violations[obj_id]['sload_prox_start_frame_id'] == 0:
-                    new_sload_prox = True
-                    all_violations[obj_id]['sload_prox_start_frame_id'] = frame_id
-                else:
-                    time_period = (frame_id - all_violations[obj_id]['sload_prox_start_frame_id']) / fps
-                    if time_period > 60: # ignore new violation within 60s
-                        new_sload_prox = True
-                        all_violations[obj_id]['sload_prox_start_frame_id'] = frame_id
+            if all_violations[obj_id]['sload_prox_start_frame_id'] == 0:
+                new_sload_prox = True
+                all_violations[obj_id]['sload_prox_start_frame_id'] = frame_id
             else:
                 time_period = (frame_id - all_violations[obj_id]['sload_prox_start_frame_id']) / fps
-                if time_period > 60: # consider 
+                if time_period > 60: # ignore new violation within 60s
                     new_sload_prox = True
                     all_violations[obj_id]['sload_prox_start_frame_id'] = frame_id
 
             all_violations[obj_id]['sload_prox'] = True
-            #all_violations[obj_id]['fall_fh__last_pushed_frame_id']=frame_id
         else:
-            #frame = cv2.rectangle(frame,(int(xj),int(yj)),(int(xj+wj),int(yj+hj)),green,2)
-            #violation_dict = {'first_frame_id':frame_id,'sload_last_pushed_frame_id':0,'sload_prox':False,'fall_fh':False,'fall_fh__last_pushed_frame_id':0}
-            #all_violations[obj_id] = violation_dict
             all_violations[obj_id]['sload_prox'] = False
+
         """for pt in inversed_pts:
         frame = cv2.circle(frame, (int(pt[0]), int(pt[1])), 5, yellow, 10)"""
 
@@ -226,6 +222,7 @@ def calculate_edge_to_person(roi_edge,frame, ori_shape, boxes,classes,frame_id, 
     vessel_area="hatch"
     viol_thresh_fl_fh = thr_f_h
     new_Fall_F_H = False
+    thr_frames = fps * 1 # Threshold of frames at which the violation persists : 1s
     #roi_edge = [self.reference_points[0],self.reference_points[1]]
     for i in range(len(boxes)):
         if classes[i]=='People':
@@ -257,34 +254,33 @@ def calculate_edge_to_person(roi_edge,frame, ori_shape, boxes,classes,frame_id, 
 
             obj_id=ids[i]
             if obj_id not in all_violations.keys():
-                violation_dict = {'first_frame_id':frame_id,'sload_last_pushed_frame_id':0,'sload_prox':False,'fall_fh':False,'fall_fh__last_pushed_frame_id':0, 'sload_prox_start_frame_id': 0, 'fall_fh_start_frame_id':0}
+                violation_dict = {'first_frame_id':frame_id,'sload_last_pushed_frame_id':0,'sload_prox':False,'fall_fh':False,'fall_fh__last_pushed_frame_id':0, 'sload_prox_start_frame_id': 0, 'sload_prox_frame_buffers': {'last_frame_id': 0, 'count': 0}, 'fall_fh_start_frame_id':0, 'fall_fh_frame_buffers':{'last_frame_id': 0, 'count': 0}}
                 all_violations[obj_id] = violation_dict
+
+            if all_violations[obj_id]['fall_fh_frame_buffers']['last_frame_id'] + 1 != frame_id:
+                all_violations[obj_id]['fall_fh_frame_buffers']['count'] = 0
+
             if round(float(distance),2)<viol_thresh_fl_fh:
-                #color = get_color(abs(obj_id))
+                all_violations[obj_id]['fall_fh_frame_buffers']['count'] += 1
+                all_violations[obj_id]['fall_fh_frame_buffers']['last_frame_id'] = frame_id
+            else:
+                all_violations[obj_id]['fall_fh_frame_buffers']['count'] = 0
+
+            if all_violations[obj_id]['fall_fh_frame_buffers']['count'] >= thr_frames:
                 frame=cv2.rectangle(frame,(int(xj),int(yj)),(int(xj+wj),int(yj+hj)), color=(0,0,255 ), thickness=line_thickness)
-                #frame=cv2.putText(frame, "Fall_F_H {}".format(round(float(distance),2)), (int(xj), int(yj)-10), cv2.FONT_HERSHEY_PLAIN, text_scale, (0, 0, 255),thickness=text_thickness)
                 frame=cv2.putText(frame, "Fall_F_H", (int(xj), int(yj)-10), cv2.FONT_HERSHEY_PLAIN, text_scale, (0, 0, 255),thickness=text_thickness)
-                #violation_dict = {'first_frame_id':frame_id,'sload_last_pushed_frame_id':0,'sload_prox':True,'fall_fh':False,'fall_fh__last_pushed_frame_id':0}
                 
-                if all_violations[obj_id]['fall_fh'] == False:
-                    if all_violations[obj_id]['fall_fh_start_frame_id'] == 0:
-                        new_Fall_F_H = True
-                        all_violations[obj_id]['fall_fh_start_frame_id'] = frame_id
-                    else:
-                        time_period = (frame_id - all_violations[obj_id]['fall_fh_start_frame_id']) / fps
-                        if time_period > 60: # ignore new violation within 60s
-                            new_Fall_F_H = True
-                            all_violations[obj_id]['fall_fh_start_frame_id'] = frame_id
+                if all_violations[obj_id]['fall_fh_start_frame_id'] == 0:
+                    new_Fall_F_H = True
+                    all_violations[obj_id]['fall_fh_start_frame_id'] = frame_id
                 else:
                     time_period = (frame_id - all_violations[obj_id]['fall_fh_start_frame_id']) / fps
-                    if time_period > 60: 
+                    if time_period > 60: # ignore new violation within 60s
                         new_Fall_F_H = True
                         all_violations[obj_id]['fall_fh_start_frame_id'] = frame_id
-
+                
                 all_violations[obj_id]['fall_fh']= True
             else:
-                #frame=cv2.rectangle(frame,(int(xj),int(yj)),(int(xj+wj),int(yj+hj)), color=green, thickness=line_thickness)
-                #frame=cv2.putText(frame, "Fall_F_H {}".format(round(float(distance),2)), (int(xj), int(yj)-10), cv2.FONT_HERSHEY_PLAIN, text_scale, green,thickness=text_thickness)
                 all_violations[obj_id]['fall_fh']= False
 
             """
