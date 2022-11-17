@@ -2,11 +2,11 @@
 ## Installation
 ### Download models
 Download following pre-trained models to the specified paths:
-https://drive.google.com/file/d/1Yb3LTVYQSWeS3EAZ2XrEw0xMewua2Qz9/view?usp=sharing 
+https://drive.google.com/file/d/1It9JsSdQctQssUdPYMcOgjFGlWGP42Fk/view?usp=share_link
 
-https://drive.google.com/file/d/18RCemKMiJzsO2sfUwWiBB-LHI4Jbq8Oh/view?usp=sharing
+https://drive.google.com/file/d/142vOv17PYnPhj6fcfYSUUlltBA1H2k2T/view?usp=sharing
 
-https://drive.google.com/file/d/1A70i9-OdeN84TO2p_sXZ8eR8Mb3vXiGl/view?usp=sharing
+https://drive.google.com/file/d/1A70i9-OdeN84TO2p_sXZ8eR8Mb3vXiGl/view?usp=share_link
 to the /safety-detection/models
 
 <b> Check constants.py file for more details </b>
