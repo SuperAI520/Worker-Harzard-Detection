@@ -307,7 +307,7 @@ def get_distances(boxes, reference_points, perspective_transform, inverse_perspe
             danger_zone_checks.append((i, j, None, in_danger)) 
     return danger_zone_checks, bottom_points, danger_zones, height_from_ground
 
-def get_danger_zones_wharf(boxes, wharf_landing_Y, reference_points, classes, old_classes, w, h, danger_zone_width_threshold, danger_zone_height_threshold):
+def get_danger_zones_wharf(boxes, wharf_landing_Y, wharf_person_height_thr, reference_points, classes, old_classes, w, h, danger_zone_width_threshold, danger_zone_height_threshold):
     danger_zones = []
     danger_zone_checks = []
     bottom_points = get_bottom_points(boxes, classes)
@@ -336,6 +336,8 @@ def get_danger_zones_wharf(boxes, wharf_landing_Y, reference_points, classes, ol
 
         for j in range(len(bottom_points)):
             if classes[j] != 'People':
+                continue
+            if boxes[j][3] < wharf_person_height_thr:
                 continue
             in_danger = is_inside_old_wharf_alex(danger_zone, bottom_points[i], bottom_points[j]) if height_from_ground[i] >= danger_zone_height_threshold else False
             danger_zone_checks.append((i, j, None, in_danger)) 

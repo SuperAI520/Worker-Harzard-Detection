@@ -69,7 +69,7 @@ def is_inside(point, box):
 def get_kiesis_url(live=False):
     live = False
     # STREAM_NAME = 'https://ap-southeast-1.console.aws.amazon.com/kinesisvideo/home?region=ap-southest-1#/streams/streamName/jp_test2'
-    STREAM_NAME = 'jp_test5'
+    STREAM_NAME = 'jp_test'
     # STREAM_NAME = os.environ.get('kinesis_url')
     kvs = boto3.client("kinesisvideo", )
     # Grab the endpoint from GetDataEndpoint
@@ -94,8 +94,8 @@ def get_kiesis_url(live=False):
             HLSFragmentSelector={
             'FragmentSelectorType': 'SERVER_TIMESTAMP',
             'TimestampRange': {
-                'StartTimestamp': datetime(2022,11,1,2,10),
-                'EndTimestamp': datetime(2022,11,1,3,30)
+                'StartTimestamp': datetime(2022,11,18,3,10),
+                'EndTimestamp': datetime(2022,11,18,7,10)
                 }
             },
             Expires = int(12*3600)
@@ -439,8 +439,8 @@ def detect(opt):
     work_area_index = -1
     cargo_tracker = CargoTracker(opt.wharf, fps, height, width)
     wharf_landing_Y = -1
+    wharf_ground_height = 0
     cargo_ids = []
-
 
     suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = 0, 0, 0
     workspaces, workspace_contours = [], []
@@ -477,6 +477,9 @@ def detect(opt):
                 work_area_index = 0
                 if not opt.wharf:
                     cargo_tracker.set_step(3)
+                if opt.wharf:
+                    _,_,_,wharf_ground_height = cv2.boundingRect(workspaces[0])
+                    
                 distance_tracker.update_workarea(workspaces[work_area_index])
                 distance_tracker.calibrate_reference_area('')
                 suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
@@ -508,6 +511,14 @@ def detect(opt):
                     distance_tracker.calibrate_lengths(calib_bboxes)
             else:
                 calibrated_frames = (calibrated_frames + 1) % 30
+
+        if wharf_landing_Y != -1 and opt.wharf:
+            calib_bboxes = []
+            for bbox in detection:
+                if bbox[-1] == names.index('People'): 
+                    calib_bboxes.append(bbox.detach().cpu())
+            if len(calib_bboxes) > 0:
+                frame = distance_tracker.calibrate_person_height_wharf(frame, calib_bboxes, wharf_landing_Y, wharf_ground_height)
 
         pred = detection.unsqueeze(0)
         c2 = time.time()

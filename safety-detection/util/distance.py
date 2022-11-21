@@ -32,6 +32,9 @@ class DistanceTracker:
             self.output_movie = cv2.VideoWriter(f"{output_dir}/{source.split('/')[-1].split('.')[0]}_dist.avi", fourcc, fps, (int(self.width*constants.OUTPUT_RES_RATIO), int(self.height*constants.OUTPUT_RES_RATIO)))
         self.calibrated_frames = 0
 
+        self.wharf_calibrated_frames = 0
+        self.wharf_avg_person_height = 0
+
         self.ignored_classes = ignored_classes
         self.danger_zone_width_threshold = danger_zone_width_threshold
         self.danger_zone_height_threshold = danger_zone_height_threshold
@@ -71,6 +74,50 @@ class DistanceTracker:
         self.suspended_threshold_hatch = max(candidate_y, roi_upper_y)
         self.suspended_threshold_wharf = self.height / 2
         self.suspended_threshold_wharf_side = max(self.reference_points[0][0], self.reference_points[3][0]) if self.angle == 'right' else min(self.reference_points[1][0], self.reference_points[2][0])
+        
+    def calibrate_person_height_wharf(self, frame, bboxes, landing_Y, ground_height):
+        pts = []
+        n_people = len(bboxes)
+        valid_range = ground_height // 10
+        for bbox in bboxes:
+            top = [(bbox[0]+bbox[2])/2, bbox[1]]
+            bottom = [(bbox[0]+bbox[2])/2, bbox[3]]
+            
+            pts += [top, bottom]
+            
+        distance_h = 0
+        valid_num = 0
+        min_human_height = self.height
+        if self.wharf_avg_person_height == 0:
+            for bbox in bboxes:
+                if abs(landing_Y - bbox[3]) > valid_range:
+                    continue
+                distance_h += np.abs(bbox[3] - bbox[1])
+                valid_num += 1
+            if valid_num > 0:
+                self.wharf_avg_person_height = distance_h / valid_num
+                self.wharf_calibrated_frames += 1
+        else:
+            for bbox in bboxes:
+                if abs(landing_Y - bbox[3]) > valid_range:
+                    continue
+                person_height = np.abs(bbox[3] - bbox[1])
+                # frame = cv2.line(frame, (int((bbox[0]+bbox[2])/2), int(bbox[3])), (int((bbox[0]+bbox[2])/2), int(bbox[1])), (255, 255, 255), 5)
+                # frame = cv2.line(frame, (int((bbox[0]+bbox[2])/2 + 7), int(bbox[3] - self.wharf_avg_person_height * 0.7)), (int((bbox[0]+bbox[2])/2) + 7, int(bbox[3])), (0, 0, 255), 5)
+                
+                if person_height < self.wharf_avg_person_height * 0.7:
+                    continue
+
+                distance_h += person_height
+                valid_num += 1
+            if valid_num > 0:
+                distance_h /= valid_num
+                wharf_avg_person_height = self.wharf_avg_person_height * self.wharf_calibrated_frames + distance_h
+                self.wharf_calibrated_frames += 1
+                self.wharf_avg_person_height = wharf_avg_person_height / self.wharf_calibrated_frames
+
+        # frame = cv2.rectangle(frame,(0,landing_Y - valid_range),(self.width - 1, landing_Y + valid_range),(255,0,0),2)
+        return frame
         
     def calibrate_lengths(self, bboxes):
         pts = []
@@ -186,7 +233,7 @@ class DistanceTracker:
         if (self.wharf or hasattr(self, 'distance_w')) and work_area_index != -1:
             if self.wharf:
                 if wharf_landing_Y > 0:
-                    pairs, project_pts, danger_zones, heights = utills.get_danger_zones_wharf(boxes, wharf_landing_Y, self.reference_points, classes, old_classes, self.width, self.height, self.danger_zone_width_threshold, self.danger_zone_height_threshold)
+                    pairs, project_pts, danger_zones, heights = utills.get_danger_zones_wharf(boxes, wharf_landing_Y, self.wharf_avg_person_height * 0.7, self.reference_points, classes, old_classes, self.width, self.height, self.danger_zone_width_threshold, self.danger_zone_height_threshold)
                     img = plot.draw_danger_zones(frame, danger_zones)
                     img, new_sload_prox, self.all_violations = plot.social_distancing_view(img, pairs, boxes, project_pts, heights,ids,self.all_violations,count,self.fps,self.filename,self.wharf) #social_distancing_view(img, pairs, boxes, reversed_pts, heights)
                 else:
