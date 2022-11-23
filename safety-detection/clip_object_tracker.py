@@ -44,8 +44,8 @@ else:
     from yolov5.utils.torch_utils import select_device, time_synchronized
 
 classes = []
-
 names = []
+all_cargos =dict()
 inf_1, inf_2, inf_3, inf_4, inf_5 = 0, 0, 0, 0, 0
 
 def xyxy2xywh(xyxy):
@@ -103,7 +103,7 @@ def get_kiesis_url(live=False):
 
     return url
 
-def update_tracks(work_area_index, workspaces, tracker, im0, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, angle, distance_check, wharf, no_action, no_nested):
+def update_tracks(work_area_index, workspaces, tracker, im0, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, angle, distance_check, wharf, frame_id, fps, no_action, no_nested):
     if (no_action and not wharf) and work_area_index != -1:
         return [], [], [],[],[]
     
@@ -273,6 +273,29 @@ def update_tracks(work_area_index, workspaces, tracker, im0, width, height, igno
             except:
                 continue
     
+
+    for i in range(len(boxes)):
+        x, y, w, h = boxes[i]
+        thr_frames = fps * 1
+        if classes[i] in ['Suspended Lean Object']:
+            obj_id = ids[i]
+            mid_point = [x + w//2, y + h//2]
+            if obj_id not in all_cargos.keys():
+                cargo_dict = {'first_frame_id':frame_id, 'first_pos':mid_point, 'valid': False}
+                all_cargos[obj_id] = cargo_dict
+
+            diff_frames = frame_id - all_cargos[obj_id]['first_frame_id']
+            if diff_frames < thr_frames:
+                classes[i] = 'nested object' # Set as an arbitrary label, not a 'Suspended Lean Object'
+            else:
+                if all_cargos[obj_id]['valid'] == False:
+                    move_distance = math.dist(mid_point, all_cargos[obj_id]['first_pos'])
+                    if move_distance > int(height / 16):
+                        all_cargos[obj_id]['valid'] = True
+                        # print(f'###########  valid cargo   {obj_id}')
+                    else:
+                        classes[i] = 'nested object' # Set as an arbitrary label, not a 'Suspended Lean Object'
+
     for i, box in enumerate(boxes):
         class_name = classes[i]
         detection = detections[i]
@@ -566,7 +589,7 @@ def detect(opt):
                 tracker.update(detections)
 
                 # update tracks
-                bboxes, classes, old_classes, distance_estimations,ids = update_tracks(work_area_index, workspaces, tracker, frame, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, opt.angle, opt.distance_check, opt.wharf, not hasattr(distance_tracker, 'distance_w'), opt.no_nested)
+                bboxes, classes, old_classes, distance_estimations,ids = update_tracks(work_area_index, workspaces, tracker, frame, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, opt.angle, opt.distance_check, opt.wharf, frame_count, fps, not hasattr(distance_tracker, 'distance_w'), opt.no_nested)
                 #print("length of bboxes {}".format(bboxes))
                 #print("length of ids {}".format(len(ids)))
                 
