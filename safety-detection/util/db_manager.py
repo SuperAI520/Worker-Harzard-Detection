@@ -87,9 +87,13 @@ def process_violation_video(local_video_fname,s3_filename,frame_id,viol_txt,viol
     # Video writer init
     vid_writer = cv2.VideoWriter(local_video_fname, cv2.VideoWriter_fourcc(*"mp4v"), int(fps),(int(width), int(height)))
     # Keep on checking the video buffers
+    retry = 0
     while list(frames_id_buffer).index((frame_id%2000)) < (video_duration_in_s*fps):
         # logger.info(str(list(frames_id_buffer).index((frame_id%2000))))
         time.sleep(1)
+        retry += 1
+        if retry == 5:
+        	break
         continue
     frames_id_list_copy = list(frames_id_buffer)
     frames_list_copy = list(annot_frame_buffer)
