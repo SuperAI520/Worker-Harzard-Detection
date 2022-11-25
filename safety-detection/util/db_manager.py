@@ -99,8 +99,9 @@ def process_violation_video(local_video_fname,s3_filename,frame_id,viol_txt,viol
     frames_list_copy = list(annot_frame_buffer)
     first_frame_ind = max(0,int((frames_id_list_copy.index((frame_id%2000))) - (video_duration_in_s*fps)))
     # logger.debug(str(first_frame_ind))
-    frames_list_copy = frames_list_copy[first_frame_ind:frames_id_list_copy.index((frame_id%2000))]
-    for each_frame in reversed(frames_list_copy):
+    frames_list_copy_save = frames_list_copy[first_frame_ind:frames_id_list_copy.index((frame_id%2000))]
+    frames_list_copy_save.append(frames_list_copy[frames_id_list_copy.index((frame_id%2000))])
+    for each_frame in reversed(frames_list_copy_save):
         # print(each_frame.shape)
         vid_writer.write(each_frame)
     vid_writer.release()
