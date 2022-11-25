@@ -331,7 +331,12 @@ def get_danger_zones_wharf(boxes, wharf_landing_Y, wharf_person_height_thr, refe
             left_bottom = [boxes[i][0] - boxes[i][2] / 8, wharf_landing_Y + boxes[i][3] / 4]
             right_top = [boxes[i][0] + boxes[i][2] * 7 / 8, wharf_landing_Y - boxes[i][3] / 4]
             right_bottom = [boxes[i][0] + boxes[i][2] * 9 / 8, wharf_landing_Y + boxes[i][3] / 4]
-            danger_zone = [left_top, left_bottom, right_bottom, right_top]
+            # danger_zone = [left_top, left_bottom, right_bottom, right_top]
+            danger_poly = Polygon([left_top, left_bottom, right_bottom, right_top])
+            workarea_poly = Polygon(reference_points.squeeze(axis=1))
+            danger_zone = danger_poly.intersection(workarea_poly)
+            int_coords = lambda x: np.array(x).round().astype(np.int32)
+            danger_zone = int_coords(danger_zone.exterior.coords)
             danger_zones.append(danger_zone)
 
         for j in range(len(bottom_points)):
