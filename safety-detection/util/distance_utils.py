@@ -327,10 +327,10 @@ def get_danger_zones_wharf(boxes, wharf_landing_Y, wharf_person_height_thr, refe
             continue
         danger_zone = None
         if height_from_ground[i] >= danger_zone_height_threshold:
-            left_top = [boxes[i][0] + boxes[i][2] / 4, wharf_landing_Y - boxes[i][3] / 4]
-            left_bottom = [boxes[i][0], wharf_landing_Y + boxes[i][3] / 4]
-            right_top = [boxes[i][0] + boxes[i][2] * 3 / 4, wharf_landing_Y - boxes[i][3] / 4]
-            right_bottom = [boxes[i][0] + boxes[i][2], wharf_landing_Y + boxes[i][3] / 4]
+            left_top = [boxes[i][0] + boxes[i][2] / 8, wharf_landing_Y - boxes[i][3] / 4]
+            left_bottom = [boxes[i][0] - boxes[i][2] / 8, wharf_landing_Y + boxes[i][3] / 4]
+            right_top = [boxes[i][0] + boxes[i][2] * 7 / 8, wharf_landing_Y - boxes[i][3] / 4]
+            right_bottom = [boxes[i][0] + boxes[i][2] * 9 / 8, wharf_landing_Y + boxes[i][3] / 4]
             danger_zone = [left_top, left_bottom, right_bottom, right_top]
             danger_zones.append(danger_zone)
 
