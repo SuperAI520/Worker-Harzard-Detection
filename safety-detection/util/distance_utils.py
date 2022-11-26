@@ -275,6 +275,7 @@ def get_scale(W, H):
 def get_distances(boxes, reference_points, perspective_transform, inverse_perspective_transform, classes, old_classes, distance_w, distance_h, w, h, danger_zone_width_threshold, danger_zone_height_threshold, average_human_height, wharf):
     danger_zones = []
     danger_zone_checks = []
+    suspended_cargo_ids = []
     roi_middle_y = (reference_points[0][1] + reference_points[1][1] + reference_points[2][1] + reference_points[3][1]) / 4
     bottom_points = get_bottom_points(boxes, classes)
     bottom_points = get_project_points(bottom_points, reference_points, classes, wharf)
@@ -293,6 +294,8 @@ def get_distances(boxes, reference_points, perspective_transform, inverse_perspe
             else:
                 height_from_ground[i] = (roi_middle_y - (boxes[i][1] + boxes[i][3]/2)) * UNIT_LENGTH // average_human_height
 
+            suspended_cargo_ids.append(i)
+
     for i in range(len(bottom_points)):
         if classes[i] != 'Suspended Lean Object':
             continue
@@ -305,11 +308,12 @@ def get_distances(boxes, reference_points, perspective_transform, inverse_perspe
                 continue
             in_danger = is_inside_old(danger_zone, bottom_points[i], bottom_points[j]) if height_from_ground[i] >= danger_zone_height_threshold else False
             danger_zone_checks.append((i, j, None, in_danger)) 
-    return danger_zone_checks, bottom_points, danger_zones, height_from_ground
+    return suspended_cargo_ids, danger_zone_checks, bottom_points, danger_zones, height_from_ground
 
 def get_danger_zones_wharf(boxes, wharf_landing_Y, wharf_person_height_thr, reference_points, classes, old_classes, w, h, danger_zone_width_threshold, danger_zone_height_threshold):
     danger_zones = []
     danger_zone_checks = []
+    suspended_cargo_ids = []
     bottom_points = get_bottom_points(boxes, classes)
     bottom_points = get_project_points_wharf(bottom_points, wharf_landing_Y, reference_points, classes)
     center_points = get_center_points(boxes)
@@ -338,7 +342,7 @@ def get_danger_zones_wharf(boxes, wharf_landing_Y, wharf_person_height_thr, refe
             int_coords = lambda x: np.array(x).round().astype(np.int32)
             danger_zone = int_coords(danger_zone.exterior.coords)
             danger_zones.append(danger_zone)
-
+        suspended_cargo_ids.append(i)
         for j in range(len(bottom_points)):
             if classes[j] != 'People':
                 continue
@@ -347,7 +351,7 @@ def get_danger_zones_wharf(boxes, wharf_landing_Y, wharf_person_height_thr, refe
             in_danger = is_inside_old_wharf_alex(danger_zone, bottom_points[i], bottom_points[j]) if height_from_ground[i] >= danger_zone_height_threshold else False
             danger_zone_checks.append((i, j, None, in_danger)) 
 
-    return danger_zone_checks, bottom_points, danger_zones, height_from_ground
+    return suspended_cargo_ids, danger_zone_checks, bottom_points, danger_zones, height_from_ground
 
 
 

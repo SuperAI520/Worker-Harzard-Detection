@@ -48,7 +48,7 @@ def bird_eye_view(frame, pairs, bottom_points, scale_w, scale_h):
 # Red: High Risk
 # Yellow: Low Risk
 # Green: No Risk 
-def social_distancing_view(frame, pairs, boxes, inversed_pts, heights,ids,all_violations,frame_id,fps,output_dir,wharf):
+def social_distancing_view(frame, cargo_ids, pairs, boxes, inversed_pts, heights,ids,all_violations,frame_id,fps,output_dir,wharf):
     red = (0, 0, 255)
     green = (0, 255, 0)
     blue = (255, 0, 0)
@@ -62,13 +62,17 @@ def social_distancing_view(frame, pairs, boxes, inversed_pts, heights,ids,all_vi
     else:
         vessel_area="hatch"
 
+    for cargo_id in cargo_ids:
+        xi, yi, wi, hi = boxes[cargo_id]
+        frame = cv2.rectangle(frame,(int(xi),int(yi)),(int(xi+wi),int(yi+hi)),blue,2)
+        
     new_sload_prox = False
     for pair in pairs:
         i, j, dist, danger = pair
         xi, yi, wi, hi = boxes[i]
         proj_center = (int(inversed_pts[i][0]), int(inversed_pts[i][1]))
         bbox_center = (int(xi+wi/2), int(yi+hi/2))
-        frame = cv2.rectangle(frame,(int(xi),int(yi)),(int(xi+wi),int(yi+hi)),blue,2)
+        # frame = cv2.rectangle(frame,(int(xi),int(yi)),(int(xi+wi),int(yi+hi)),blue,2)
         #frame = cv2.circle(frame, bbox_center, 5, yellow, 10)
         #frame = cv2.circle(frame, proj_center, 5, yellow, 10)
         #frame = cv2.line(frame, proj_center, bbox_center, red, 2)

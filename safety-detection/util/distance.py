@@ -233,18 +233,18 @@ class DistanceTracker:
         if (self.wharf or hasattr(self, 'distance_w')) and work_area_index != -1:
             if self.wharf:
                 if wharf_landing_Y > 0:
-                    pairs, project_pts, danger_zones, heights = utills.get_danger_zones_wharf(boxes, wharf_landing_Y, self.wharf_avg_person_height * 0.7, self.reference_points, classes, old_classes, self.width, self.height, self.danger_zone_width_threshold, self.danger_zone_height_threshold)
+                    cargo_ids, pairs, project_pts, danger_zones, heights = utills.get_danger_zones_wharf(boxes, wharf_landing_Y, self.wharf_avg_person_height * 0.7, self.reference_points, classes, old_classes, self.width, self.height, self.danger_zone_width_threshold, self.danger_zone_height_threshold)
                     img = plot.draw_danger_zones(frame, danger_zones)
-                    img, new_sload_prox, self.all_violations = plot.social_distancing_view(img, pairs, boxes, project_pts, heights,ids,self.all_violations,count,self.fps,self.filename,self.wharf) #social_distancing_view(img, pairs, boxes, reversed_pts, heights)
+                    img, new_sload_prox, self.all_violations = plot.social_distancing_view(img, cargo_ids, pairs, boxes, project_pts, heights,ids,self.all_violations,count,self.fps,self.filename,self.wharf) #social_distancing_view(img, pairs, boxes, reversed_pts, heights)
                 else:
                     img = frame
             else:
                 # print('Distance', len(boxes))
-                pairs, warped_pts, danger_zones, heights = utills.get_distances(boxes, self.reference_points, self.perspective_transform, self.inverse_perspective_transform, classes, old_classes, self.distance_w, self.distance_h, self.width, self.height, self.danger_zone_width_threshold, self.danger_zone_height_threshold, self.wharf_human_height, self.wharf)
+                cargo_ids, pairs, warped_pts, danger_zones, heights = utills.get_distances(boxes, self.reference_points, self.perspective_transform, self.inverse_perspective_transform, classes, old_classes, self.distance_w, self.distance_h, self.width, self.height, self.danger_zone_width_threshold, self.danger_zone_height_threshold, self.wharf_human_height, self.wharf)
                 reversed_pts = utills.get_perspective_transform(warped_pts, self.inverse_perspective_transform)
                 reversed_danger_zones = utills.get_reversed_danger_zones(danger_zones, self.inverse_perspective_transform)
                 img = plot.draw_danger_zones(frame, reversed_danger_zones)
-                img, new_sload_prox, self.all_violations = plot.social_distancing_view(img, pairs, boxes, reversed_pts, heights,ids,self.all_violations,count,self.fps,self.filename,self.wharf) #social_distancing_view(img, pairs, boxes, reversed_pts, heights)
+                img, new_sload_prox, self.all_violations = plot.social_distancing_view(img, cargo_ids, pairs, boxes, reversed_pts, heights,ids,self.all_violations,count,self.fps,self.filename,self.wharf) #social_distancing_view(img, pairs, boxes, reversed_pts, heights)
 
                 roi_edge= self.edge_points
                 # print(roi_edge)
