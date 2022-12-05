@@ -2,7 +2,7 @@
 ## Installation
 ### Download models
 Download following pre-trained models to the specified paths:
-https://drive.google.com/file/d/1It9JsSdQctQssUdPYMcOgjFGlWGP42Fk/view?usp=share_link
+https://drive.google.com/file/d/1zuAEKBypsnH_nIHfixH7Fjj0O4rQHygJ/view?usp=share_link
 
 https://drive.google.com/file/d/142vOv17PYnPhj6fcfYSUUlltBA1H2k2T/view?usp=sharing
 
