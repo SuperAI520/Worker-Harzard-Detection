@@ -62,7 +62,11 @@ class DBManager:
 
 s3_uploader = s3_transfer()
 sqs_push = sqs_transfer()
-
+# re-initialize s3 and sqs transfer objects if in prod
+if "env" in os.environ:
+    if os.environ["env"] == "prod":
+        s3_uploader = s3_transfer(sqs_queue_name="sqs_violations_v1")
+        sqs_push = sqs_transfer(aws_bucket_name="jp-violations")
 annot_frame_buffer = deque(maxlen=600)
 frames_id_buffer = deque(maxlen=600)
 
@@ -106,8 +110,9 @@ def process_violation_video(local_video_fname,s3_filename,frame_id,viol_txt,viol
         vid_writer.write(each_frame)
     vid_writer.release()
     # Add module to process video to h264 codec
-    convert_video_h264(local_file=local_video_fname,video_duration_in_s=video_duration_in_s)
+    # convert_video_h264(local_file=local_video_fname,video_duration_in_s=video_duration_in_s)
     _,obj_url = s3_uploader.s3_file_transfer(local_file=local_video_fname,s3_file=s3_filename,violation_id=violation_id)
+    obj_url = osp.splitext(obj_url)[0] + '.mp4'
     sqs_status = sqs_push.push_msg(kinesis_name=os.environ.get('kinesis_url'),msg_type='video',violation_id=violation_id,category='PPE',subcategory=viol_txt,object_url=obj_url)    
 
 def s3_sqs_handler(local_filepath, local_filename,s3_filename,viol_txt,frame_id,height,width,fps,process_video = True):
@@ -118,7 +123,7 @@ def s3_sqs_handler(local_filepath, local_filename,s3_filename,viol_txt,frame_id,
     sqs_status = sqs_push.push_msg(msg_type='image',violation_id=violation_id,kinesis_name=os.environ.get('kinesis_url'),category='PPE',subcategory=viol_txt,object_url=obj_url)
     video_duration_in_s = 5.0
     if process_video:
-        s3_video_thread = threading.Timer(video_duration_in_s*1.5,process_violation_video,args=(osp.join(local_filepath, (osp.splitext(local_filename)[0]+'.mp4')),(osp.splitext(s3_filename)[0]+'.mp4'),frame_id,viol_txt,violation_id,width,height,video_duration_in_s,fps))
+        s3_video_thread = threading.Timer(video_duration_in_s*1.5,process_violation_video,args=(osp.join(local_filepath, (osp.splitext(local_filename)[0]+'.avi')),(osp.splitext(s3_filename)[0]+'.mp4'),frame_id,viol_txt,violation_id,width,height,video_duration_in_s,fps))
         # s3_video_thread.daemon = True
         s3_video_thread.start()
         threads.thread_manager.add_thread(s3_video_thread)

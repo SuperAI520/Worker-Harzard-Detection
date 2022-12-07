@@ -8,7 +8,7 @@ from loguru import logger
 boto3.setup_default_session(profile_name='jp')
 
 class sqs_transfer():
-    def __init__(self,sqs_queue_name = 'sqs_violations_v1') -> None:
+    def __init__(self,sqs_queue_name = 'uat_sqs_violations_v1') -> None:
         self.sqs = boto3.resource('sqs',endpoint_url="https://sqs.ap-southeast-1.amazonaws.com")
         self.sqs_queue_name = sqs_queue_name
 
@@ -47,7 +47,7 @@ class sqs_transfer():
     
 
 class s3_transfer():
-    def __init__(self,region_name='ap-southeast-1',aws_bucket_name='jp-violations') -> None:
+    def __init__(self,region_name='ap-southeast-1',aws_bucket_name='uat-jp-violations') -> None:
         self.region_name = region_name
         self.aws_bucket_name = aws_bucket_name
     

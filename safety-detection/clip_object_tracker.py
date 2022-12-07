@@ -15,6 +15,7 @@ import torch
 import numpy as np
 import math
 import boto3
+from loguru import logger
 
 # deep sort imports
 from deep_sort import preprocessing, nn_matching
@@ -66,11 +67,10 @@ def is_inside(point, box):
         x, y, w, h = box
         return point[0] >= x and point[0] <= x+w and point[1] >= y and point[1] <= y+h
 
-def get_kiesis_url(live=False):
-    live = False
-    # STREAM_NAME = 'https://ap-southeast-1.console.aws.amazon.com/kinesisvideo/home?region=ap-southest-1#/streams/streamName/jp_test2'
-    STREAM_NAME = 'jp_test'
-    # STREAM_NAME = os.environ.get('kinesis_url')
+def get_kiesis_url(live=True):
+    live = True if os.environ.get("live") == "1" \
+            else False
+    STREAM_NAME = os.environ.get('kinesis_url')
     kvs = boto3.client("kinesisvideo", )
     # Grab the endpoint from GetDataEndpoint
     endpoint = kvs.get_data_endpoint(
@@ -94,14 +94,44 @@ def get_kiesis_url(live=False):
             HLSFragmentSelector={
             'FragmentSelectorType': 'SERVER_TIMESTAMP',
             'TimestampRange': {
-                'StartTimestamp': datetime(2022,11,18,3,10),
-                'EndTimestamp': datetime(2022,11,18,7,10)
+                'StartTimestamp': datetime(2022,11,18,5,0),
+                'EndTimestamp': datetime(2022,11,18,7,0)
                 }
             },
             Expires = int(12*3600)
             )['HLSStreamingSessionURL']
 
     return url
+
+def get_camera_area():
+
+    base_url = "https://jp-safety.groundup.ai/api/"
+    url = "https://jp-safety.groundup.ai/api/kinesis-stream"
+    # Issue jwt token first 
+    auth_payload = "{\n    \"email\":\"admin@groundup.ai\",\n    \"password\":\"Password1$\"\n}"
+    headers = {
+    'Content-Type': 'application/json'
+    }
+    token_response = requests.request("POST", base_url+"auth/login", headers=headers, data=auth_payload)
+    payload={}
+    headers = {
+        'Authorization': 'Bearer ' + str(token_response.json()['token'])
+    }
+
+    response = requests.request("GET", url, headers=headers, data=payload)
+    all_cams_meta = response.json()
+    cam_area = 'wharf'
+    stream_name = os.environ.get('kinesis_url')
+    for each_cam in all_cams_meta:
+        # logger.debug(each_cam)
+        if each_cam['name'] == stream_name:
+            area = each_cam['area']
+            if area is not None:
+                if 'hatch' in area.lower().split(' '):
+                    cam_area = 'hatch'
+                return cam_area
+        
+    return cam_area
 
 def update_tracks(work_area_index, workspaces, tracker, im0, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, angle, distance_check, wharf, frame_id, fps, no_action, no_nested):
     if (no_action and not wharf) and work_area_index != -1:
@@ -397,6 +427,15 @@ def get_detection_frame_yolor(frame, engine):
     return det   
 
 def detect(opt):
+    # Adding for KVS
+    source = get_kiesis_url()
+    logger.debug(source)
+    opt.source=source
+    if get_camera_area() == 'wharf':
+        # At this stage we need to exit as it is not able to work for wharf
+        logger.info("At wharf currently model is not supported")
+        sys.exit()
+
     global inf_1, inf_2, inf_3, inf_4, inf_5
     t0 = time_synchronized()
     ignored_classes = opt.ignored_classes
@@ -426,7 +465,7 @@ def detect(opt):
     # initialize tracker
     tracker = Tracker(metric)
 
-    source, imgsz = opt.source, opt.img_size
+    # source, imgsz = opt.source, opt.img_size
 
     # Directories
     save_dir = Path(increment_path(Path(opt.project) / opt.name,
