@@ -431,9 +431,10 @@ def detect(opt):
     source = get_kiesis_url()
     logger.debug(source)
     opt.source=source
-    if get_camera_area() == 'wharf':
+    # Support enabled for wharf in uat only
+    if os.environ["env"] == "prod" and get_camera_area() == 'wharf':
         # At this stage we need to exit as it is not able to work for wharf
-        logger.info("At wharf currently model is not supported")
+        logger.info("At prod wharf currently model is not supported")
         sys.exit()
 
     global inf_1, inf_2, inf_3, inf_4, inf_5
@@ -484,7 +485,7 @@ def detect(opt):
         exit()
 
     fps = int(cap.get(cv2.CAP_PROP_FPS))
-    # fps = 15
+    fps = 25
     frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     frames = frames if opt.budget == -1 else min(frames, int(fps*60*opt.budget))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -697,6 +698,10 @@ if __name__ == '__main__':
 
     opt = parser.parse_args()
     print(opt)
+    if get_camera_area() == 'hatch':
+        opt.wharf = False
+    else:
+        opt.wharf = True
 
     with torch.no_grad():
         detect(opt)
