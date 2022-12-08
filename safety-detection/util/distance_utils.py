@@ -167,6 +167,9 @@ def is_inside_old_wharf(danger_zone, center, coord):
     return inside_danger_zone
 
 def is_inside_old_wharf_alex(danger_zone, center, coord):
+    if len(danger_zone) == 0:
+        return False
+
     pts = np.array(danger_zone, np.int32)
     inside = cv2.pointPolygonTest(pts, coord, False)
     return inside >= 0
