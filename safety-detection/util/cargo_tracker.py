@@ -6,7 +6,7 @@ import constants
 import math
 import collections 
 
-TRACK_LIMIT_TIME = 1.5
+TRACK_LIMIT_TIME = 0.5
 MOVEMENT_THR = 50
 WHARF_TRACKING_CYCLE = 3
 TOLERANCE_DIS = -50
@@ -196,6 +196,6 @@ class CargoTracker:
                 self.cargos_pos = [c for j, c in enumerate(self.cargos_pos) if j not in delete_idxs]
                 self.distances_array = [c for j, c in enumerate(self.distances_array) if j not in delete_idxs]
 
-            # print(self.accumulated_cargo_ids, current_cargo_ids, self.wharf_landing_Y)
+            print(self.accumulated_cargo_ids, current_cargo_ids, self.wharf_landing_Y)
             
         return success, work_area_index

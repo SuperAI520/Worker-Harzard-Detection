@@ -7,6 +7,7 @@ from pathlib import Path
 from turtle import distance
 import glob
 import os
+import requests
 
 import clip
 import time
@@ -306,7 +307,7 @@ def update_tracks(work_area_index, workspaces, tracker, im0, width, height, igno
 
     for i in range(len(boxes)):
         x, y, w, h = boxes[i]
-        thr_frames = fps * 1
+        thr_frames = int(fps * 0.5)
         if classes[i] in ['Suspended Lean Object']:
             obj_id = ids[i]
             mid_point = [x + w//2, y + h//2]
@@ -322,7 +323,7 @@ def update_tracks(work_area_index, workspaces, tracker, im0, width, height, igno
                     move_distance = math.dist(mid_point, all_cargos[obj_id]['first_pos'])
                     if move_distance > int(height / 16):
                         all_cargos[obj_id]['valid'] = True
-                        # print(f'###########  valid cargo   {obj_id}')
+                        print(f'###########  valid cargo   {obj_id}')
                     else:
                         classes[i] = 'nested object' # Set as an arbitrary label, not a 'Suspended Lean Object'
 
