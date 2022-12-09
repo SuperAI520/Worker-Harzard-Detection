@@ -486,7 +486,7 @@ def detect(opt):
         exit()
 
     fps = int(cap.get(cv2.CAP_PROP_FPS))
-    fps = 25
+    fps = 12
     frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     frames = frames if opt.budget == -1 else min(frames, int(fps*60*opt.budget))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -655,7 +655,7 @@ def detect(opt):
             break
 
         elapsed_time = int((time.time()-c0)*1000)
-        # print(f'\t\t\t elapsed time {elapsed_time}: {inf_1}, {inf_2}, {inf_3}, {inf_4}, {inf_5}')
+        print(f'\t\t\t elapsed time {elapsed_time}: {inf_1}, {inf_2}, {inf_3}, {inf_4}, {inf_5}')
         # Display the resulting frame
         # cv2.imshow("output", frame)
         
