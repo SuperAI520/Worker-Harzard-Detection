@@ -384,7 +384,8 @@ def calculate_danger_zone_coordinates(old_class, box, center_pt, reference_point
             transformed_h = np.sqrt((h / 2) ** 2 - transformed_w ** 2)
     else:
         transformed_h = (h / min_height) * box_h
-
+    transformed_w = transformed_w * 1.2
+    transformed_h = transformed_h * 1.2
     left = max(0, center_pt[0] - transformed_w/2)
     right = min(w, center_pt[0] + transformed_w/2)
     top = max(0, center_pt[1] - transformed_h/2)
