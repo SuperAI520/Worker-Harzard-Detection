@@ -14,6 +14,8 @@ from util.aws_utils import sqs_transfer
 from util.aws_utils import s3_transfer
 import util.threads as threads
 
+category_name = 'Suspended Load & Fall From Height'
+
 class DBManager:
 	def __init__(self, source, width, height, fps, output_dir):
 		# self.video_dir = Path(Path(output_dir) / 'VIDEO')
@@ -113,14 +115,14 @@ def process_violation_video(local_video_fname,s3_filename,frame_id,viol_txt,viol
     # convert_video_h264(local_file=local_video_fname,video_duration_in_s=video_duration_in_s)
     _,obj_url = s3_uploader.s3_file_transfer(local_file=local_video_fname,s3_file=s3_filename,violation_id=violation_id)
     obj_url = osp.splitext(obj_url)[0] + '.mp4'
-    sqs_status = sqs_push.push_msg(kinesis_name=os.environ.get('kinesis_url'),msg_type='video',violation_id=violation_id,category='PPE',subcategory=viol_txt,object_url=obj_url)    
+    sqs_status = sqs_push.push_msg(kinesis_name=os.environ.get('kinesis_url'),msg_type='video',violation_id=violation_id,category=category_name,subcategory=viol_txt,object_url=obj_url)    
 
 def s3_sqs_handler(local_filepath, local_filename,s3_filename,viol_txt,frame_id,height,width,fps,process_video = True):
     # logger.debug("Violation of s3 + sqs going to be processed as  " + str(viol_txt))
     violation_id = 0
     filename = osp.join(local_filepath, local_filename)
     violation_id,obj_url = s3_uploader.s3_file_transfer(local_file=filename,s3_file=s3_filename)
-    sqs_status = sqs_push.push_msg(msg_type='image',violation_id=violation_id,kinesis_name=os.environ.get('kinesis_url'),category='PPE',subcategory=viol_txt,object_url=obj_url)
+    sqs_status = sqs_push.push_msg(msg_type='image',violation_id=violation_id,kinesis_name=os.environ.get('kinesis_url'),category=category_name,subcategory=viol_txt,object_url=obj_url)
     video_duration_in_s = 5.0
     if process_video:
         s3_video_thread = threading.Timer(video_duration_in_s*1.5,process_violation_video,args=(osp.join(local_filepath, (osp.splitext(local_filename)[0]+'.avi')),(osp.splitext(s3_filename)[0]+'.mp4'),frame_id,viol_txt,violation_id,width,height,video_duration_in_s,fps))

@@ -95,8 +95,8 @@ def get_kiesis_url(live=True):
             HLSFragmentSelector={
             'FragmentSelectorType': 'SERVER_TIMESTAMP',
             'TimestampRange': {
-                'StartTimestamp': datetime(2022,11,18,5,0),
-                'EndTimestamp': datetime(2022,11,18,7,0)
+                'StartTimestamp': datetime(2022,12,7,13,15),
+                'EndTimestamp': datetime(2022,12,7,13,18)
                 }
             },
             Expires = int(12*3600)
@@ -524,7 +524,16 @@ def detect(opt):
 
         if (frame_count / fps) % 300 == 0 or len(workspaces) == 0: # detect work area once every 5 mins
             cargo_tracker.clear()
-
+            detection = get_detection_frame_yolor(frame, engine)
+            if len(detection) == 0:
+                frame_count = frame_count+1
+                if frame_count == frames:
+                    break
+                
+                # cv2.imshow("output", frame)
+                if cv2.waitKey(1) == ord('q'):
+                    break
+                continue
             workspaces, center_points, workspace_contours = workspace_detector.segment_workspace(frame)
             if len(workspaces) == 0:
                 frame_count = frame_count+1

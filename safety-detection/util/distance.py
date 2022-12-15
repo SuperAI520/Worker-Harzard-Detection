@@ -255,7 +255,7 @@ class DistanceTracker:
             if new_sload_prox or new_Fall_F_H:
                 viol_text = ''
                 if new_sload_prox:
-                    viol_text += 'sload_prox_'
+                    viol_text += 'Suspended_Load'
                 if new_Fall_F_H:
                     viol_text += 'Fall_F_H_'
 
