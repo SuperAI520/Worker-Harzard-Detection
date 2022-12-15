@@ -22,7 +22,7 @@ COPY ./safety-detection/requirements.txt /install/requirements.txt
 
 RUN python -m pip install --upgrade pip && python -m pip install -r /install/requirements.txt -f https://download.pytorch.org/whl/torch_stable.html
 
-RUN MMCV_WITH_OPS=1 mim install mmcv-full
+RUN MMCV_WITH_OPS=1 mim install mmcv-full==1.6.0
 
 WORKDIR ${WORKDIR}
 
