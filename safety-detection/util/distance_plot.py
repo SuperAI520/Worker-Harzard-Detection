@@ -96,7 +96,7 @@ def social_distancing_view(frame, cargo_ids, pairs, boxes, inversed_pts, heights
 
         if all_violations[obj_id]['sload_prox_frame_buffers']['count'] >= thr_frames:
             frame = cv2.rectangle(frame,(int(xj),int(yj)),(int(xj+wj),int(yj+hj)),red,2)
-            frame=cv2.putText(frame, 'sload_prox', (int(xj), int(yj)-10), cv2.FONT_HERSHEY_PLAIN, text_scale,red,thickness=text_thickness) 
+            frame=cv2.putText(frame, 'Suspended_Load', (int(xj), int(yj)-10), cv2.FONT_HERSHEY_PLAIN, text_scale,red,thickness=text_thickness) 
             if all_violations[obj_id]['sload_prox_start_frame_id'] == 0:
                 new_sload_prox = True
                 all_violations[obj_id]['sload_prox_start_frame_id'] = frame_id
