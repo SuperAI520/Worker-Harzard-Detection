@@ -15,7 +15,7 @@ from util.aws_utils import s3_transfer
 import util.threads as threads
 
 category_name = 'Suspended Load & Fall From Height'
-
+s3_lock = threading.Lock()
 class DBManager:
 	def __init__(self, source, width, height, fps, output_dir):
 		# self.video_dir = Path(Path(output_dir) / 'VIDEO')
@@ -32,7 +32,7 @@ class DBManager:
 
 	def snap_image(self, frame, viol_text):
 		now = datetime.now()
-		dt_string = now.strftime("%Y%m%d%H%M%S")
+		dt_string = now.strftime("%Y%m%d%H%M%S%f")
 		s_img_name = osp.splitext(osp.basename(self.filename))[0] + "_" + viol_text + dt_string + ".png"
 		snap_path = self.image_dir
 		snap_imgname = osp.join(snap_path, s_img_name)
@@ -113,19 +113,23 @@ def process_violation_video(local_video_fname,s3_filename,frame_id,viol_txt,viol
     vid_writer.release()
     # Add module to process video to h264 codec
     # convert_video_h264(local_file=local_video_fname,video_duration_in_s=video_duration_in_s)
+    s3_lock.acquire()
     _,obj_url = s3_uploader.s3_file_transfer(local_file=local_video_fname,s3_file=s3_filename,violation_id=violation_id)
     obj_url = osp.splitext(obj_url)[0] + '.mp4'
     sqs_status = sqs_push.push_msg(kinesis_name=os.environ.get('kinesis_url'),msg_type='video',violation_id=violation_id,category=category_name,subcategory=viol_txt,object_url=obj_url)    
+    s3_lock.release()
 
 def s3_sqs_handler(local_filepath, local_filename,s3_filename,viol_txt,frame_id,height,width,fps,process_video = True):
     # logger.debug("Violation of s3 + sqs going to be processed as  " + str(viol_txt))
     violation_id = 0
     filename = osp.join(local_filepath, local_filename)
+    s3_lock.acquire()
     violation_id,obj_url = s3_uploader.s3_file_transfer(local_file=filename,s3_file=s3_filename)
     sqs_status = sqs_push.push_msg(msg_type='image',violation_id=violation_id,kinesis_name=os.environ.get('kinesis_url'),category=category_name,subcategory=viol_txt,object_url=obj_url)
+    s3_lock.release()
     video_duration_in_s = 5.0
     if process_video:
-        s3_video_thread = threading.Timer(video_duration_in_s*1.5,process_violation_video,args=(osp.join(local_filepath, (osp.splitext(local_filename)[0]+'.avi')),(osp.splitext(s3_filename)[0]+'.mp4'),frame_id,viol_txt,violation_id,width,height,video_duration_in_s,fps))
+        s3_video_thread = threading.Timer(video_duration_in_s*1.5,process_violation_video,args=(osp.join(local_filepath, (osp.splitext(local_filename)[0]+'.avi')),(osp.splitext(s3_filename)[0]+'.avi'),frame_id,viol_txt,violation_id,width,height,video_duration_in_s,fps))
         # s3_video_thread.daemon = True
         s3_video_thread.start()
         threads.thread_manager.add_thread(s3_video_thread)
