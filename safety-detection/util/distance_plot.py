@@ -64,9 +64,11 @@ def social_distancing_view(frame, cargo_ids, pairs, boxes, inversed_pts, heights
 
     for cargo_id in cargo_ids:
         xi, yi, wi, hi = boxes[cargo_id]
-        frame = cv2.rectangle(frame,(int(xi),int(yi)),(int(xi+wi),int(yi+hi)),blue,2)
+        frame = cv2.rectangle(frame,(int(xi),int(yi)),(int(xi+wi),int(yi+hi)),blue,3)
         
     new_sload_prox = False
+    tl = 3
+    tf = max(tl - 1, 1) 
     for pair in pairs:
         i, j, dist, danger = pair
         xi, yi, wi, hi = boxes[i]
@@ -95,8 +97,11 @@ def social_distancing_view(frame, cargo_ids, pairs, boxes, inversed_pts, heights
             all_violations[obj_id]['sload_prox_frame_buffers']['count'] = 0
 
         if all_violations[obj_id]['sload_prox_frame_buffers']['count'] >= thr_frames:
-            frame = cv2.rectangle(frame,(int(xj),int(yj)),(int(xj+wj),int(yj+hj)),red,2)
-            frame=cv2.putText(frame, 'Suspended_Load', (int(xj), int(yj)-10), cv2.FONT_HERSHEY_PLAIN, text_scale,red,thickness=text_thickness) 
+            frame = cv2.rectangle(frame,(int(xj),int(yj)),(int(xj+wj),int(yj+hj)),red,3,lineType=cv2.LINE_AA)
+            label = 'Suspended_Load'
+            t_size = cv2.getTextSize(label, 0, fontScale=1, thickness=tf)[0]
+            frame = cv2.rectangle(frame, (int(xj),int(yj)),(int(xj+t_size[0]),int(yj) - t_size[1] - 3), red, -1, cv2.LINE_AA)
+            frame = cv2.putText(frame, label, (int(xj), int(yj) - 2), 0, tl / 3, [225, 255, 255], thickness=tf, lineType=cv2.LINE_AA)
             if all_violations[obj_id]['sload_prox_start_frame_id'] == 0:
                 new_sload_prox = True
                 all_violations[obj_id]['sload_prox_start_frame_id'] = frame_id
@@ -228,6 +233,8 @@ def calculate_edge_to_person(roi_edge,frame, ori_shape, boxes,classes,frame_id, 
     new_Fall_F_H = False
     thr_frames = fps * 1 # Threshold of frames at which the violation persists : 1s
     #roi_edge = [self.reference_points[0],self.reference_points[1]]
+    tl = 3
+    tf = max(tl - 1, 1) 
     for i in range(len(boxes)):
         if classes[i]=='People':
             #i, j, dist, danger = pair
@@ -271,8 +278,11 @@ def calculate_edge_to_person(roi_edge,frame, ori_shape, boxes,classes,frame_id, 
                 all_violations[obj_id]['fall_fh_frame_buffers']['count'] = 0
 
             if all_violations[obj_id]['fall_fh_frame_buffers']['count'] >= thr_frames:
-                frame=cv2.rectangle(frame,(int(xj),int(yj)),(int(xj+wj),int(yj+hj)), color=(0,0,255 ), thickness=line_thickness)
-                frame=cv2.putText(frame, "Fall_F_H", (int(xj), int(yj)-10), cv2.FONT_HERSHEY_PLAIN, text_scale, (0, 0, 255),thickness=text_thickness)
+                frame = cv2.rectangle(frame,(int(xj),int(yj)),(int(xj+wj),int(yj+hj)),red,3,lineType=cv2.LINE_AA)
+                label = 'Fall_F_H'
+                t_size = cv2.getTextSize(label, 0, fontScale=1, thickness=tf)[0]
+                frame=cv2.rectangle(frame, (int(xj),int(yj)),(int(xj+t_size[0]),int(yj) - t_size[1] - 3), red, -1, cv2.LINE_AA)
+                frame = cv2.putText(frame, label, (int(xj), int(yj) - 2), 0, tl / 3, [225, 255, 255], thickness=tf, lineType=cv2.LINE_AA)
                 
                 if all_violations[obj_id]['fall_fh_start_frame_id'] == 0:
                     new_Fall_F_H = True
