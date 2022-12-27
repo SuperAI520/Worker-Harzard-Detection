@@ -7,6 +7,72 @@ from scipy.spatial import distance as dist
 import constants
 import math
 
+RIGHT = 1
+LEFT = -1
+ZERO = 0
+  
+def directionOfPoint(A, B, P):
+    # # global RIGHT, LEFT, ZERO
+    # a = np.array([P[0]-A[0],P[1]-A[1],0])   
+    # b = np.array([B[0]-A[0],B[1]-A[1],0])   
+    # c = np.cross(a,b) 
+    # if c[2] > 0:     
+    #     return LEFT
+    # if c[2] < 0:     
+    #     return RIGHT
+    
+    # return ZERO
+    aX = A[0]
+    aY = A[1]
+    bX = B[0]
+    bY = B[1]
+    cX = P[0]
+    cY = P[1]
+
+    val = ((bX - aX)*(cY - aY) - (bY - aY)*(cX - aX))
+    thresh = 0
+    if val >= thresh:
+        return LEFT
+    elif val <= -thresh:
+        return RIGHT
+    else:
+        return ZERO
+
+def get_contact_point(p1, p2, center_point, cnt, _print = False):
+    min_dist = 100000
+    max_dist = 0
+    ret = True
+    min_contact_pt = None
+    max_contact_pt = None
+    contact_pt = None
+    center_position = directionOfPoint(p1, p2, center_point)
+    for ptt in cnt:
+        pt = ptt[0]
+        distance=int(np.linalg.norm(np.cross(p2-p1,pt-p1)/np.linalg.norm(p2-p1)))
+        position = directionOfPoint(p1, p2, pt)
+        if position * center_position >= 0:
+            if distance < min_dist:
+                min_dist = distance
+                min_contact_pt = (pt[0], pt[1])
+        else:
+            min_dist = 0
+            if distance > max_dist:
+                max_dist = distance
+                max_contact_pt = (pt[0], pt[1])
+        if _print:
+            print(position, center_position, p1, p2, pt, distance, min_dist, max_dist)
+    if max_dist == 0 and min_dist == 0:
+        return False, contact_pt, False
+
+    if max_dist > 0:
+        extend_flag = True
+        contact_pt = max_contact_pt
+    else:
+        extend_flag = False
+        contact_pt = min_contact_pt
+
+    return ret, contact_pt, extend_flag
+
 class DetectWorkspace:
     def __init__(self, wharf):
         self.config = constants.SEGMENTATION_CONFIG_PATH
@@ -255,7 +321,7 @@ class DetectWorkspace:
                 if area_array[i] > thr_area:
                     new_cnts.append(cnt)
 
-            workspace_rects, center_points = self.detect_workspace_rect_hatch(frame, new_cnts)
+            # workspace_rects, center_points = self.detect_workspace_rect_hatch(frame, new_cnts)
         else:
             #Find biggest contour
             biggest_cnt = []
@@ -281,10 +347,80 @@ class DetectWorkspace:
             cv2.drawContours(color_seg, [cnt], -1, (0, 0, 255), 2)
 
         workspace_contours = approx_cnts
+
+        if not self.wharf:
+            workspace_rects, center_points = self.detect_workspace_rect_hatch(frame, approx_cnts)
+            workspace_rects, workspace_contours = optimize_workspace_rects(workspace_rects, workspace_contours)
+    
         if self.wharf:
             workspace_rects = workspace_contours
             
         return workspace_rects, center_points, workspace_contours
+
+def optimize_workspace_rects(rects, contours):
+    for i, rect in enumerate(rects):
+        center_x, center_y = line_intersection((rect[0], rect[2]), (rect[1], rect[3]))
+        ret_bottom, pt_bottom, extend_bottom = get_contact_point(rect[0], rect[1], [center_x, center_y], contours[i])
+        ret_right, pt_right, extend_right = get_contact_point(rect[1], rect[2], [center_x, center_y], contours[i])
+        ret_top, pt_top, extend_top = get_contact_point(rect[2], rect[3], [center_x, center_y], contours[i])
+        ret_left, pt_left, extend_left = get_contact_point(rect[3], rect[0], [center_x, center_y], contours[i])
+        # print(ret_bottom, ret_right, ret_top, ret_left)
+        # print(extend_bottom, extend_right, extend_top, extend_left)
+        if ret_left:
+            pt = line_intersection((rect[0], rect[3]), ((pt_left[0] - 10, pt_left[1]), pt_left))
+            left_offset = math.dist(pt, pt_left)
+            tmp_0, tmp_3 = rect[0].copy(), rect[3].copy()
+            if extend_left:
+                tmp_0[0] -= left_offset
+                tmp_3[0] -= left_offset
+            else:
+                tmp_0[0] += left_offset
+                tmp_3[0] += left_offset
+            rect[3] = line_intersection((rect[2], rect[3]), (tmp_0, tmp_3))
+            rect[0] = line_intersection((rect[0], rect[1]), (tmp_0, tmp_3))
+        
+        if ret_right:
+            pt = line_intersection((rect[1], rect[2]), ((pt_right[0] - 10, pt_right[1]), pt_right))
+            right_offset = math.dist(pt, pt_right)
+            tmp_1, tmp_2 = rect[1].copy(), rect[2].copy()
+            if extend_right:
+                tmp_1[0] += right_offset
+                tmp_2[0] += right_offset
+            else:
+                tmp_1[0] -= right_offset
+                tmp_2[0] -= right_offset
+            rect[2] = line_intersection((rect[2], rect[3]), (tmp_1, tmp_2))
+            rect[1] = line_intersection((rect[0], rect[1]), (tmp_1, tmp_2))
+        
+        if ret_top:
+            pt = line_intersection((rect[2], rect[3]), ((pt_top[0], pt_top[1] + 10), pt_top))
+            top_offset = math.dist(pt, pt_top)
+            tmp_2, tmp_3 = rect[2].copy(), rect[3].copy()
+            if extend_top:
+                tmp_2[1] -= top_offset
+                tmp_3[1] -= top_offset
+            else:
+                tmp_2[1] += top_offset
+                tmp_3[1] += top_offset
+            rect[3] = line_intersection((rect[0], rect[3]), (tmp_2, tmp_3))
+            rect[2] = line_intersection((rect[2], rect[1]), (tmp_2, tmp_3))
+
+        if ret_bottom:
+            pt = line_intersection((rect[1], rect[0]), ((pt_bottom[0], pt_bottom[1] + 10), pt_bottom))
+            bottom_offset = math.dist(pt, pt_bottom)
+            tmp_0, tmp_1 = rect[0].copy(), rect[1].copy()
+            if extend_bottom:
+                tmp_0[1] += bottom_offset
+                tmp_1[1] += bottom_offset
+            else:
+                tmp_0[1] -= bottom_offset
+                tmp_1[1] -= bottom_offset
+            rect[0] = line_intersection((rect[0], rect[3]), (tmp_1, tmp_0))
+            rect[1] = line_intersection((rect[2], rect[1]), (tmp_1, tmp_0))
+        rects[i] = rect
+    return rects, contours
+
+
 
 def order_points(pts):
     # sort the points based on their x-coordinates

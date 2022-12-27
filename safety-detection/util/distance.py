@@ -220,7 +220,7 @@ class DistanceTracker:
             centers.append((x,y))
         return centers
 
-    def calculate_distance(self, work_area_index, boxes, classes, old_classes, distance_estimations, frame, count,ids, thr_f_h, wharf_landing_Y, db_manager):
+    def calculate_distance(self, work_area_index, boxes, classes, old_classes, distance_estimations, frame, count,ids, thr_f_h, wharf_landing_Y, hatch_reference, db_manager):
         # boxes = []
         # classes = []
         #boxes, classes = self.get_bboxes(tracker, names)
@@ -240,7 +240,7 @@ class DistanceTracker:
                     img = frame
             else:
                 # print('Distance', len(boxes))
-                cargo_ids, pairs, warped_pts, danger_zones, heights = utills.get_distances(boxes, self.reference_points, self.perspective_transform, self.inverse_perspective_transform, classes, old_classes, self.distance_w, self.distance_h, self.width, self.height, self.danger_zone_width_threshold, self.danger_zone_height_threshold, self.wharf_human_height, self.wharf)
+                cargo_ids, pairs, warped_pts, danger_zones, heights = utills.get_distances(boxes, self.reference_points, hatch_reference, self.perspective_transform, self.inverse_perspective_transform, classes, old_classes, self.distance_w, self.distance_h, self.width, self.height, self.danger_zone_width_threshold, self.danger_zone_height_threshold, self.wharf_human_height, self.wharf)
                 reversed_pts = utills.get_perspective_transform(warped_pts, self.inverse_perspective_transform)
                 reversed_danger_zones = utills.get_reversed_danger_zones(danger_zones, self.inverse_perspective_transform)
                 img = plot.draw_danger_zones(frame, reversed_danger_zones)

@@ -95,8 +95,8 @@ def get_kiesis_url(live=True):
             HLSFragmentSelector={
             'FragmentSelectorType': 'SERVER_TIMESTAMP',
             'TimestampRange': {
-                'StartTimestamp': datetime(2022,12,7,13,15),
-                'EndTimestamp': datetime(2022,12,7,13,18)
+                'StartTimestamp': datetime(2022,12,17,5,47,30),
+                'EndTimestamp': datetime(2022,12,17,6,0)
                 }
             },
             Expires = int(12*3600)
@@ -548,8 +548,8 @@ def detect(opt):
             if len(workspaces) == 1:
                 print(f'*********************   only 1 work area')
                 work_area_index = 0
-                if not opt.wharf:
-                    cargo_tracker.set_step(3)
+                # if not opt.wharf:
+                #     cargo_tracker.set_step(3)
                 if opt.wharf:
                     _,_,_,wharf_ground_height = cv2.boundingRect(workspaces[0])
                     
@@ -562,10 +562,14 @@ def detect(opt):
         if opt.wharf:
             if cargo_tracker.get_wharf_landing_Y() > 0:
                 wharf_landing_Y = cargo_tracker.get_wharf_landing_Y()
-            if wharf_landing_Y > 0:
-                pt1 = (0, wharf_landing_Y)
-                pt2 = (width, wharf_landing_Y)
+            # if wharf_landing_Y > 0:
+            #     pt1 = (0, wharf_landing_Y)
+            #     pt2 = (width, wharf_landing_Y)
                 # frame = cv2.line(frame, pt1, pt2, (0, 255, 0), 5)
+        else:
+            hatch_reference = cargo_tracker.get_hatch_reference()
+            # if len(hatch_reference) != 0:
+            #     frame = cv2.circle(frame, hatch_reference[0], 20, (0, 255, 0), 20)
 
         detection = get_detection_frame_yolor(frame, engine)
         c1 = time.time()
@@ -598,7 +602,7 @@ def detect(opt):
         inf_2 = int((c2-c1) *1000)
         
         if len(pred) == 0: # detect main work area from candidates
-            result, work_area_index = cargo_tracker.track_no_detection_case(work_area_index)
+            result, work_area_index = cargo_tracker.track_no_detection_case(work_area_index, workspace_contours)
             if result:
                 distance_tracker.update_workarea(workspaces[work_area_index])
                 distance_tracker.calibrate_reference_area('')
@@ -644,7 +648,7 @@ def detect(opt):
                 #print("length of ids {}".format(len(ids)))
                 
                 # track unloading cargo and detect main work area from candidates
-                result, work_area_index = cargo_tracker.track(work_area_index, ids, classes, bboxes, center_points, workspaces)
+                result, work_area_index = cargo_tracker.track(work_area_index, ids, classes, bboxes, center_points, workspaces, workspace_contours)
                 if result:
                     distance_tracker.update_workarea(workspaces[work_area_index])
                     distance_tracker.calibrate_reference_area('')
@@ -654,7 +658,7 @@ def detect(opt):
                 inf_4 = int((c4-c3) *1000)
 
                 # update distance tracker
-                distance_tracker.calculate_distance(work_area_index, bboxes, classes, old_classes, distance_estimations, frame, frame_count,ids, opt.thr_f_h, wharf_landing_Y, db_manager)
+                distance_tracker.calculate_distance(work_area_index, bboxes, classes, old_classes, distance_estimations, frame, frame_count,ids, opt.thr_f_h, wharf_landing_Y, hatch_reference, db_manager)
                 # Print time (inference + NMS)
                 c5 = time.time()
                 inf_5 = int((c5-c4) *1000)
@@ -664,7 +668,7 @@ def detect(opt):
             break
 
         elapsed_time = int((time.time()-c0)*1000)
-        print(f'\t\t\t elapsed time {elapsed_time}: {inf_1}, {inf_2}, {inf_3}, {inf_4}, {inf_5}')
+        # print(f'\t\t\t elapsed time {elapsed_time}: {inf_1}, {inf_2}, {inf_3}, {inf_4}, {inf_5}')
         # Display the resulting frame
         # cv2.imshow("output", frame)
         

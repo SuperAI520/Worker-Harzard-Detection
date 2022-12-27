@@ -2,6 +2,7 @@
 import cv2
 import numpy as np
 import constants
+import math
 from shapely.geometry import Polygon
 
 UNIT_LENGTH = constants.UNIT_LENGTH
@@ -275,15 +276,29 @@ def get_scale(W, H):
     
     return float(dis_w/W),float(dis_h/H)
 
-def get_distances(boxes, reference_points, perspective_transform, inverse_perspective_transform, classes, old_classes, distance_w, distance_h, w, h, danger_zone_width_threshold, danger_zone_height_threshold, average_human_height, wharf):
+def get_hatch_reference_points(hatch_reference):
+    points = []
+    points.append(hatch_reference[0])
+    points.append((hatch_reference[0][0] - hatch_reference[1][0] // 2, hatch_reference[0][1] - hatch_reference[1][1] // 2))
+    points.append((hatch_reference[0][0] + hatch_reference[1][0] // 2, hatch_reference[0][1] - hatch_reference[1][1] // 2))
+    points.append((hatch_reference[0][0] + hatch_reference[1][0] // 2, hatch_reference[0][1] + hatch_reference[1][1] // 2))
+    points.append((hatch_reference[0][0] - hatch_reference[1][0] // 2, hatch_reference[0][1] + hatch_reference[1][1] // 2))
+    return points
+
+def get_distances(boxes, reference_points, hatch_reference, perspective_transform, inverse_perspective_transform, classes, old_classes, distance_w, distance_h, w, h, danger_zone_width_threshold, danger_zone_height_threshold, average_human_height, wharf):
     danger_zones = []
     danger_zone_checks = []
     suspended_cargo_ids = []
+    transformed_hatch_reference_points = []
     roi_middle_y = (reference_points[0][1] + reference_points[1][1] + reference_points[2][1] + reference_points[3][1]) / 4
     bottom_points = get_bottom_points(boxes, classes)
     bottom_points = get_project_points(bottom_points, reference_points, classes, wharf)
     bottom_points = get_perspective_transform(bottom_points, perspective_transform)
     center_points = get_center_points(boxes)
+
+    if len(hatch_reference) != 0:
+        hatch_reference_points = get_hatch_reference_points(hatch_reference)
+        transformed_hatch_reference_points = get_perspective_transform(hatch_reference_points, perspective_transform)
     transformed_center_points = get_perspective_transform(center_points, perspective_transform)
     height_from_ground = [-1] * len(center_points)
     for i, cls in enumerate(classes):
@@ -304,7 +319,7 @@ def get_distances(boxes, reference_points, perspective_transform, inverse_perspe
             continue
         danger_zone = None
         if height_from_ground[i] >= danger_zone_height_threshold:
-            danger_zone = calculate_danger_zone_coordinates(old_classes[i], boxes[i], bottom_points[i], reference_points, distance_w, distance_h, w, h, danger_zone_width_threshold, wharf)
+            danger_zone = calculate_danger_zone_coordinates(old_classes[i], boxes[i], bottom_points[i], reference_points, transformed_hatch_reference_points, distance_w, distance_h, w, h, danger_zone_width_threshold, wharf)
             danger_zones.append(danger_zone)
         for j in range(len(bottom_points)):
             if classes[j] != 'People':
@@ -367,35 +382,45 @@ def get_danger_zones_wharf(boxes, wharf_landing_Y, wharf_person_height_thr, refe
 
 
 
-def calculate_danger_zone_coordinates(old_class, box, center_pt, reference_points, distance_w, distance_h, w, h, width_threshold, wharf):
-    # box_w, box_h = box[2:]
-    # box_diag = UNIT_LENGTH * np.sqrt((box_w / distance_w) ** 2 + (box_h / distance_h) ** 2)
-    # transformed_w = box_w * DANGER_ZONE_DIAG / box_diag
-    # if wharf:
-    #     transformed_w = min(transformed_w, width_threshold)
-    # transformed_h = box_h * DANGER_ZONE_DIAG / box_diag
-    
+def calculate_danger_zone_coordinates(old_class, box, center_pt, reference_points, hatch_reference_points, distance_w, distance_h, w, h, width_threshold, wharf):
     box_w, box_h = box[2:]
     box_diag = np.sqrt(box_w ** 2 + box_h ** 2)
 
-    distance1 = np.linalg.norm(np.cross(reference_points[1]-reference_points[0],reference_points[2]-reference_points[0])/np.linalg.norm(reference_points[1]-reference_points[0]))
-    distance2 = np.linalg.norm(np.cross(reference_points[1]-reference_points[0],reference_points[3]-reference_points[0])/np.linalg.norm(reference_points[1]-reference_points[0]))
-    
-    min_height = min(distance1, distance2)
-
-    # transform_rate = h / box_diag
-    transformed_w = box_w
-    if box_diag > min_height:
-        if old_class in ['Container', 'Small Pipe', 'Large Pipe', 'Suspended Lean Object', 'Wooden Board', 'Iron Rake', 'Wood', 'Steel Plate']:
-            transformed_h = np.sqrt(h ** 2 - transformed_w ** 2)
-        else:
-            transformed_h = np.sqrt((h / 2) ** 2 - transformed_w ** 2)
+    if len(hatch_reference_points) != 0:
+        distance1 = math.dist(hatch_reference_points[1], hatch_reference_points[3])
+        distance2 = math.dist(hatch_reference_points[2], hatch_reference_points[4])
+        cargo_len = max(distance1, distance2)
+        out_rate = cargo_len / box_diag
+        if out_rate > 1:
+            out_rate = 1
+        transformed_w = out_rate * box_w
+        transformed_h = out_rate * box_h
+        transformed_w = transformed_w * 1.2
+        transformed_h = transformed_h * 1.2
+        left = max(0, center_pt[0] - transformed_w/2)
+        right = min(w, center_pt[0] + transformed_w/2)
+        top = max(0, hatch_reference_points[0][1] - transformed_h/2)
+        bottom = min(h, hatch_reference_points[0][1] + transformed_h/2)
     else:
-        transformed_h = (h / min_height) * box_h
-    transformed_w = transformed_w * 1.2
-    transformed_h = transformed_h * 1.2
-    left = max(0, center_pt[0] - transformed_w/2)
-    right = min(w, center_pt[0] + transformed_w/2)
-    top = max(0, center_pt[1] - transformed_h/2)
-    bottom = min(h, center_pt[1] + transformed_h/2)
+        distance1 = np.linalg.norm(np.cross(reference_points[1]-reference_points[0],reference_points[2]-reference_points[0])/np.linalg.norm(reference_points[1]-reference_points[0]))
+        distance2 = np.linalg.norm(np.cross(reference_points[1]-reference_points[0],reference_points[3]-reference_points[0])/np.linalg.norm(reference_points[1]-reference_points[0]))
+        min_height = min(distance1, distance2)
+
+        # transform_rate = h / box_diag
+        transformed_w = box_w
+        if box_diag > min_height:
+            if old_class in ['Container', 'Small Pipe', 'Large Pipe', 'Suspended Lean Object', 'Wooden Board', 'Iron Rake', 'Wood', 'Steel Plate']:
+                transformed_h = np.sqrt(h ** 2 - transformed_w ** 2)
+            else:
+                transformed_h = np.sqrt((h / 2) ** 2 - transformed_w ** 2)
+        else:
+            transformed_h = (h / min_height) * box_h
+        # transformed_w = transformed_w * 1.2
+        # transformed_h = transformed_h * 1.2
+        left = max(0, center_pt[0] - transformed_w/2)
+        right = min(w, center_pt[0] + transformed_w/2)
+        top = max(0, center_pt[1] - transformed_h/2)
+        bottom = min(h, center_pt[1] + transformed_h/2)
+        return [left, top, right, bottom]
+
     return [left, top, right, bottom]
