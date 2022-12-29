@@ -106,7 +106,7 @@ class CargoTracker:
         return reference_pos
 
 
-    def track(self, work_area_index, ids, classes, bboxes, center_points, workspace, workspace_contours):
+    def track(self, work_area_index, ids, classes, bboxes, center_points, workspaces, workspace_contours):
         success = False
         if self.step == 1:
             self.step = 2

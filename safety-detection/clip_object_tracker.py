@@ -95,8 +95,8 @@ def get_kiesis_url(live=True):
             HLSFragmentSelector={
             'FragmentSelectorType': 'SERVER_TIMESTAMP',
             'TimestampRange': {
-                'StartTimestamp': datetime(2022,12,17,5,47,30),
-                'EndTimestamp': datetime(2022,12,17,6,0)
+                'StartTimestamp': datetime(2022,12,7,17,10,0),
+                'EndTimestamp': datetime(2022,12,7,17,30)
                 }
             },
             Expires = int(12*3600)
@@ -504,6 +504,7 @@ def detect(opt):
     cargo_tracker = CargoTracker(opt.wharf, fps, height, width)
     wharf_landing_Y = -1
     wharf_ground_height = 0
+    hatch_reference = []
     cargo_ids = []
 
     suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = 0, 0, 0
