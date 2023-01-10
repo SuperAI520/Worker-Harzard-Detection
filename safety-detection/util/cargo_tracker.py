@@ -5,6 +5,7 @@ from scipy.spatial import distance as dist
 import constants
 import math
 import collections 
+from loguru import logger
 
 TRACK_LIMIT_TIME = 0.5
 MOVEMENT_THR = 50
@@ -62,7 +63,7 @@ class CargoTracker:
                 min_value = min(self.distances_array[n])
                 min_index = self.distances_array[n].index(min_value)
                 work_area_index = min_index
-                print(f'********** 1 ***********   unloaded cargo {self.accumulated_cargo_ids[n]} started from {min_index}st workarea')
+                logger.debug(f'********** 1 ***********   unloaded cargo {self.accumulated_cargo_ids[n]} started from {min_index}st workarea')
                 flag = False
                 for z, iid_y in enumerate(self.hatch_reference_pos):
                     if iid_y[0] == self.accumulated_cargo_ids[n]:
@@ -171,7 +172,7 @@ class CargoTracker:
                         diff_pos = (last_pos['pos'][0] - init_pos['pos'][0], last_pos['pos'][1] - init_pos['pos'][1])
                         if not self.wharf:
                             if diff_pos[1] > 0 or abs(diff_pos[1]) < MOVEMENT_THR: # Process only unloading cargos and there should be a Y-axis movement.
-                                print(f'XXXXXXXX  invalid unloading movement   id: {self.accumulated_cargo_ids[n]}')
+                                logger.debug(f'XXXXXXXX  invalid unloading movement   id: {self.accumulated_cargo_ids[n]}')
                                 delete_idxs.append(n)
                                 continue
 
@@ -192,10 +193,10 @@ class CargoTracker:
                             if self.tracking_cycles == 0:
                                 self.step = 3
                             
-                            print(f'********** 2 ***********   unloaded cargo {self.accumulated_cargo_ids[n]} started from {min_index}st workarea')
+                            logger.debug(f'********** 2 ***********   unloaded cargo {self.accumulated_cargo_ids[n]} started from {min_index}st workarea')
                         else:
                             if diff_pos[1] < 0 or abs(diff_pos[1]) < 50: # Process only unloading cargos and there should be a Y-axis movement.
-                                print(f'XXXXXXXX  invalid loading movement   id: {self.accumulated_cargo_ids[n]}')
+                                logger.debug(f'XXXXXXXX  invalid loading movement   id: {self.accumulated_cargo_ids[n]}')
                                 delete_idxs.append(n)
                                 continue
                             offset = 0
@@ -208,7 +209,7 @@ class CargoTracker:
                                 #     continue
 
                                 offset = (abs(inside) + self.distances_array[n][-1][0] / 4) if inside < 0 else 0 
-                            print(f'********** 2 ***********   loaded cargo {self.accumulated_cargo_ids[n]} to ({last_pos})')
+                            logger.debug(f'********** 2 ***********   loaded cargo {self.accumulated_cargo_ids[n]} to ({last_pos})')
                             
                             flag = False
                             for z, iid_y in enumerate(self.wharf_landing_Y):
@@ -222,7 +223,7 @@ class CargoTracker:
                                 self.tracking_cycles -= 1
                             
                             if self.tracking_cycles == 0:
-                                print('###########################   END tracking')
+                                logger.debug('###########################   END tracking')
                                 self.step = 3
 
                         self.distances_array.clear()

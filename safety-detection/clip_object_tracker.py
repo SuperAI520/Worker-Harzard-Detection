@@ -95,8 +95,18 @@ def get_kiesis_url(live=True):
             HLSFragmentSelector={
             'FragmentSelectorType': 'SERVER_TIMESTAMP',
             'TimestampRange': {
-                'StartTimestamp': datetime(2022,12,7,17,10,0),
-                'EndTimestamp': datetime(2022,12,7,17,30)
+                # 'StartTimestamp': datetime(2022,12,8,0,45,00), #jp_test4
+                # 'EndTimestamp': datetime(2022,12,8,1,00,00)
+                # 'StartTimestamp': datetime(2022,12,7,16,10,00), #jp_test4
+                # 'EndTimestamp': datetime(2022,12,7,16,23,00)
+                # 'StartTimestamp': datetime(2022,12,17,5,45,00),  #jp_test2
+                # 'EndTimestamp': datetime(2022,12,17,5,55,00)
+                'StartTimestamp': datetime(2022,12,17,12,35,00),  #jp_test2
+                'EndTimestamp': datetime(2022,12,17,12,45,00)
+                # 'StartTimestamp': datetime(2022,12,18,2,40,00),  #jp_test2
+                # 'EndTimestamp': datetime(2022,12,18,2,50,00)
+                # 'StartTimestamp': datetime(2022,12,8,12,10,00),  #jp_test6
+                # 'EndTimestamp': datetime(2022,12,8,12,20,00)
                 }
             },
             Expires = int(12*3600)
@@ -323,7 +333,7 @@ def update_tracks(work_area_index, workspaces, tracker, im0, width, height, igno
                     move_distance = math.dist(mid_point, all_cargos[obj_id]['first_pos'])
                     if move_distance > int(height / 16):
                         all_cargos[obj_id]['valid'] = True
-                        print(f'###########  valid cargo   {obj_id}')
+                        logger.debug(f'###########  valid cargo   {obj_id}')
                     else:
                         classes[i] = 'nested object' # Set as an arbitrary label, not a 'Suspended Lean Object'
 
@@ -399,7 +409,7 @@ def get_all_detections_yolov5(vid_path, engine, budget):
     return dets, height, width, fps 
 
 def get_all_detections_yolor(vid_path, dataset, engine, budget):
-    print('Detection YOLOR starts...')
+    logger.debug('Detection YOLOR starts...')
     s_time = time.time()
     imgs_array = []
     dets = []
@@ -482,7 +492,7 @@ def detect(opt):
     cap = cv2.VideoCapture(source)
     vid_path, vid_writer = None, None
     if not cap.isOpened():
-        print("Cannot open camera")
+        logger.debug("Cannot open camera")
         exit()
 
     fps = int(cap.get(cv2.CAP_PROP_FPS))
@@ -509,14 +519,14 @@ def detect(opt):
 
     suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = 0, 0, 0
     workspaces, workspace_contours = [], []
-    print('Safety zone detection starts...')
+    logger.debug('Safety zone detection starts...')
     # cv2.namedWindow("output", cv2.WINDOW_NORMAL)  
     while True:
         # Capture frame-by-frame
         ret, frame = cap.read()
         # if frame is read correctly ret is True
         if not ret:
-            print("Can't receive frame (stream end?). Exiting ...")
+            logger.debug("Can't receive frame (stream end?). Exiting ...")
             break
 
         c0 = time.time()
@@ -547,7 +557,7 @@ def detect(opt):
                 continue
 
             if len(workspaces) == 1:
-                print(f'*********************   only 1 work area')
+                logger.debug(f'*********************   only 1 work area')
                 work_area_index = 0
                 # if not opt.wharf:
                 #     cargo_tracker.set_step(3)
@@ -712,7 +722,7 @@ if __name__ == '__main__':
                         help='Threshold for the fall_from_height')
 
     opt = parser.parse_args()
-    print(opt)
+    logger.debug(opt)
     if get_camera_area() == 'hatch':
         opt.wharf = False
     else:

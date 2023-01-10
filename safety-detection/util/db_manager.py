@@ -13,6 +13,7 @@ import multiprocessing
 from util.aws_utils import sqs_transfer
 from util.aws_utils import s3_transfer
 import util.threads as threads
+from loguru import logger
 
 category_name = 'Suspended Load & Fall From Height'
 s3_lock = threading.Lock()
@@ -36,7 +37,7 @@ class DBManager:
 		s_img_name = osp.splitext(osp.basename(self.filename))[0] + "_" + viol_text + dt_string + ".png"
 		snap_path = self.image_dir
 		snap_imgname = osp.join(snap_path, s_img_name)
-		print(f'[snap_image]  snap violation image  {snap_imgname}')
+		logger.debug(f'[snap_image]  snap violation image  {snap_imgname}')
 		cv2.imwrite(snap_imgname, frame)
 		return snap_path, s_img_name
 
