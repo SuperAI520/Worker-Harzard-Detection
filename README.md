@@ -4,7 +4,7 @@
 Download following pre-trained models to the specified paths:
 https://drive.google.com/file/d/1TwhIpwNxLl7aEVS35LOzI_Zd62ctY8Jx/view?usp=sharing
 
-https://drive.google.com/file/d/1X3GEehCI441GfIa22YecKmx7EPy5yHOC/view?usp=sharing
+https://drive.google.com/file/d/1fEibG3OcvhyFFRsF2xDwfsw2i-4Z_qcJ/view?usp=share_link
 
 https://drive.google.com/file/d/1A70i9-OdeN84TO2p_sXZ8eR8Mb3vXiGl/view?usp=share_link
 to the /safety-detection/models
