@@ -31,7 +31,7 @@ from util.db_manager import DBManager
 import util.threads as threads
 
 import constants
-from utils_.yolor import Yolor
+from util.yolor import Yolor
 # from utils_.yolov5 import Yolov5, Yolov5_IV
 if constants.USE_YOLOR_MODEL:
     from yolor.utils.datasets import LoadImages
@@ -95,14 +95,14 @@ def get_kiesis_url(live=True):
             HLSFragmentSelector={
             'FragmentSelectorType': 'SERVER_TIMESTAMP',
             'TimestampRange': {
-                # 'StartTimestamp': datetime(2022,12,8,0,45,00), #jp_test4
-                # 'EndTimestamp': datetime(2022,12,8,1,00,00)
+                'StartTimestamp': datetime(2022,12,8,0,45,00), #jp_test4
+                'EndTimestamp': datetime(2022,12,8,1,00,00)
                 # 'StartTimestamp': datetime(2022,12,7,16,10,00), #jp_test4
                 # 'EndTimestamp': datetime(2022,12,7,16,23,00)
                 # 'StartTimestamp': datetime(2022,12,17,5,45,00),  #jp_test2
                 # 'EndTimestamp': datetime(2022,12,17,5,55,00)
-                'StartTimestamp': datetime(2022,12,17,12,35,00),  #jp_test2
-                'EndTimestamp': datetime(2022,12,17,12,45,00)
+                # 'StartTimestamp': datetime(2022,12,17,12,35,00),  #jp_test2
+                # 'EndTimestamp': datetime(2022,12,17,12,45,00)
                 # 'StartTimestamp': datetime(2022,12,18,2,40,00),  #jp_test2
                 # 'EndTimestamp': datetime(2022,12,18,2,50,00)
                 # 'StartTimestamp': datetime(2022,12,8,12,10,00),  #jp_test6

@@ -5,7 +5,7 @@ import uuid
 from botocore.exceptions import NoCredentialsError
 from loguru import logger
 # Set the profile for boto3 account
-boto3.setup_default_session(profile_name='jp')
+# boto3.setup_default_session(profile_name='jp')
 
 class sqs_transfer():
     def __init__(self,sqs_queue_name = 'uat_sqs_violations_v1') -> None:
