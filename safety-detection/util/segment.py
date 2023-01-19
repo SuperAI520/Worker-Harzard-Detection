@@ -12,16 +12,6 @@ LEFT = -1
 ZERO = 0
   
 def directionOfPoint(A, B, P):
-    # # global RIGHT, LEFT, ZERO
-    # a = np.array([P[0]-A[0],P[1]-A[1],0])   
-    # b = np.array([B[0]-A[0],B[1]-A[1],0])   
-    # c = np.cross(a,b) 
-    # if c[2] > 0:     
-    #     return LEFT
-    # if c[2] < 0:     
-    #     return RIGHT
-    
-    # return ZERO
     aX = A[0]
     aY = A[1]
     bX = B[0]

@@ -10,7 +10,6 @@ import os
 import requests
 
 import clip
-import time
 import cv2
 import torch
 import numpy as np
@@ -32,18 +31,9 @@ import util.threads as threads
 
 import constants
 from util.yolor import Yolor
-# from utils_.yolov5 import Yolov5, Yolov5_IV
-if constants.USE_YOLOR_MODEL:
-    from yolor.utils.datasets import LoadImages
-    from yolor.utils.general import set_logging, increment_path
-    from yolor.utils.plots import plot_one_box
-    from yolor.utils.torch_utils import select_device, time_synchronized
-else:
-    from fastai.vision.all import *
-    from yolov5.utils.datasets import LoadImages
-    from yolov5.utils.general import set_logging, increment_path
-    from yolov5.utils.plots import plot_one_box
-    from yolov5.utils.torch_utils import select_device, time_synchronized
+from yolor.utils.general import set_logging, increment_path
+from yolor.utils.plots import plot_one_box
+from yolor.utils.torch_utils import select_device, time_synchronized
 
 classes = []
 names = []
@@ -63,10 +53,6 @@ def xywh2xyxy(xywh):
     x2 = xywh[2] + xywh[0]
     y2 = xywh[3] + xywh[1]
     return (x1,y1,x2,y2)
-
-def is_inside(point, box):
-        x, y, w, h = box
-        return point[0] >= x and point[0] <= x+w and point[1] >= y and point[1] <= y+h
 
 def get_kiesis_url(live=True):
     live = True if os.environ.get("live") == "1" \
@@ -144,29 +130,15 @@ def get_camera_area():
         
     return cam_area
 
-def update_tracks(work_area_index, workspaces, tracker, im0, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, angle, distance_check, wharf, frame_id, fps, no_action, no_nested):
+def update_tracks(work_area_index, workspaces, tracker, im0, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, wharf, frame_id, fps, no_action):
     if (no_action and not wharf) and work_area_index != -1:
         return [], [], [],[],[]
-    
-    max_distances = {
-        'Forklift': constants.MAX_DISTANCE_FOR_FORKLIFT,
-        'Suspended Lean Object': constants.MAX_DISTANCE_FOR_SUSPENDED_LEAN_OBJECT,
-        'chain': constants.MAX_DISTANCE_FOR_CHAIN,
-        'People': constants.MAX_DISTANCE_FOR_PEOPLE,
-        'Human Carrier': constants.MAX_DISTANCE_FOR_HUMAN_CARRIER,
-    }
-
-    human_height_coefficient = constants.HUMAN_HEIGHT_COEFFICIENT
-    forklift_height_coefficient = constants.FORKLIFT_HEIGHT_COEFFICIENT
-    human_carrier_height_coefficient = constants.HUMAN_CARRIER_HEIGHT_COEFFICIENT
 
     boxes = []
     classes = []
     old_classes = []
     detections = []
     ids = []
-    heights = []
-    areas = []
     for track in tracker.tracks:
         if not track.is_confirmed() or track.time_since_update > 1:
             continue
@@ -202,119 +174,8 @@ def update_tracks(work_area_index, workspaces, tracker, im0, width, height, igno
             inside = cv2.pointPolygonTest(workspaces[0], [x + w/2, y + h], False)
             if inside < 0 and h / height >= 0.08:
                 classes[i] = 'Suspended Lean Object'
-    
-    for i in range(len(boxes)):
-        class_name = classes[i]
-        xywh = boxes[i]
-        if class_name in ignored_classes:
-            continue
-        if class_name in ['People', 'Human Carrier', 'Forklift']:
-            if xywh[3]/height > 0:
-                heights.append(xywh[3]/height)
-            else:
-                heights.append(1)
-            areas.append(-1)
-        else:
-            heights.append(-1)
-            if (xywh[2] * xywh[3]) / (height * width) > 0:
-                areas.append( (xywh[2] * xywh[3]) / (height * width) )
-            else:
-                areas.append(1)
 
-    # only for converting chain to suspended lean object. if the chain is ignored, no need for it!
-    if not 'Suspended Lean Object' in classes and not 'chain' in ignored_classes:
-        for i, cls in enumerate(classes):
-            if cls == 'chain':
-                x, y, w, h = boxes[i]
-                bottom1 = (x, y+h)
-                bottom2 = (x+w, y+h)
-                if y <= suspended_threshold:
-                    not_inside = True
-                    for j, box in enumerate(boxes):
-                        if classes[j] != 'People' and i != j:
-                            if is_inside(bottom1, box) or is_inside(bottom2, box):
-                                # print(bottom1, bottom2, box)
-                                not_inside = False
-                    if not_inside:
-                        classes[i] = 'Suspended Lean Object'
-
-    try:
-        if no_nested:
-            nested_ids = []
-            for i, box_i in enumerate(boxes):
-                # check whether it is in a forklift or a human carrier
-                for j, box_j in enumerate(boxes):
-                    if detections[j] == 'Forklift' and detections[i] == 'Forklift' and i != j:
-                        p1 = (box_i[0] , box_i[1] )
-                        p2 = (box_i[0] , box_i[1]+box_i[3] )
-                        p3 = (box_i[0] + box_i[2] , box_i[1] )
-                        p4 = (box_i[0] + box_i[2] , box_i[1]+box_i[3] )
-                        inside_bbox = is_inside(p1, box_j) and is_inside(p2, box_j) and is_inside(p3, box_j) and is_inside(p4, box_j)
-                        if inside_bbox:
-                            nested_ids.append(i)
-            # print([(ids[idx]) for idx in nested_ids])
-            for nested_id in list(set(nested_ids)):
-                classes[nested_id] = 'nested object'
-    except:
-        print('No nested error has been handled!')
-
-    # if there is no people, we have not reference measurement and we cannot do distance estimation
-    if not 'People' in classes or not wharf:
-        distance_check = False
-
-    distance_estimations = []
-    if distance_check:
-        max_people_height = -1.0
-        i = 0
-        while i < len(classes):
-            if classes[i] == 'People' and heights[i] > max_people_height:
-                max_people_height = heights[i]
-            i+=1
-        first_object_distance = human_height_coefficient / max_people_height
-        first_objects = {cls: -1.0 for cls in classes if not cls in ['People', 'Human Carrier', 'Forklift']}
-        for i, cls in enumerate(classes):
-            if not cls in ['People', 'Human Carrier', 'Forklift']:
-                first_objects[cls] = max(first_objects[cls], areas[i])
-        for i, cls in enumerate(classes):
-            if not cls in ['People', 'Human Carrier', 'Forklift']:
-                reference_area = first_objects[cls]
-                reference_distance = first_object_distance
-                object_area = areas[i]
-                object_distance = np.sqrt(np.square(reference_distance) * reference_area / object_area)
-                distance_estimations.append(object_distance)
-            elif cls == 'People':
-                object_distance = human_height_coefficient / heights[i]
-                distance_estimations.append(object_distance)
-            elif cls == 'Human Carrier':
-                object_distance = human_carrier_height_coefficient / heights[i]
-                distance_estimations.append(object_distance)
-                # print(object_distance, heights[i])
-            elif cls == 'Forklift':
-                object_distance = forklift_height_coefficient / heights[i]
-                distance_estimations.append(object_distance)
-            #far_check[i] = object_distance < max_distances[cls]
-            # print(i, distance_estimations[-1], classes[i], detections[i])
-
-        for i, box_i in enumerate(boxes):
-            try:
-                if classes[i] == 'nested object':
-                    continue
-                # check whether it is in a forklift or a human carrier
-                for j, box_j in enumerate(boxes):
-                    if classes[j] in ['Forklift', 'Human Carrier'] and classes[i] == 'People':
-                        p1 = (box_i[0] , box_i[1] )
-                        p2 = (box_i[0] , box_i[1]+box_i[3] )
-                        p3 = (box_i[0] + box_i[2] , box_i[1] )
-                        p4 = (box_i[0] + box_i[2] , box_i[1]+box_i[3] )
-                        inside_bbox = is_inside(p1, box_j) and is_inside(p2, box_j) and is_inside(p3, box_j) and is_inside(p4, box_j)
-                        if inside_bbox:
-                            distance_estimations[i] = distance_estimations[j]
-                if distance_estimations[i] > max_distances[classes[i]] or (classes[i] != 'People' and (box_i[3] * box_i[2]) / (height * width) < 0.0025):
-                    classes[i] = 'far object'
-            except:
-                continue
-    
-
+    # Consider a cargo traveling a constant distance in 0.5 seconds as valid cargo.
     for i in range(len(boxes)):
         x, y, w, h = boxes[i]
         thr_frames = int(fps * 0.5)
@@ -341,13 +202,12 @@ def update_tracks(work_area_index, workspaces, tracker, im0, width, height, igno
         class_name = classes[i]
         detection = detections[i]
         track_id = ids[i]
-        cur_distance = int(distance_estimations[i]) if distance_check else -1
-        if (not class_name in ignored_classes) and class_name !='far object' and class_name != 'nested object':
+        if (not class_name in ignored_classes) and class_name != 'nested object':
             xyxy = xywh2xyxy(box)
             original_label = f'{detection} #{track_id}'
-            label = f'{original_label} {cur_distance} CM' if distance_check else original_label
+            label = original_label
             # plot_one_box(xyxy, im0, label=label,color=get_color_for(original_label), line_thickness=3)
-    return boxes, classes, old_classes, distance_estimations,ids
+    return boxes, classes, old_classes, ids
 
 def get_color_for(class_num):
     colors = [
@@ -370,63 +230,6 @@ def get_color_for(class_num):
 
     return rgb
 
-def get_all_detections_yolov5(vid_path, engine, budget):
-    print('Detection YOLOv5 starts...')
-    s_time = time.time()
-    imgs_array = []
-    dets = []
-    cap = cv2.VideoCapture(vid_path)
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
-    frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    frames = frames if budget == -1 else min(frames, int(fps*60*budget))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    total_count = 0
-    batch_size = constants.DETECTION_BATCH_SIZE
-    while total_count < frames:
-        ret_val, img = cap.read()
-        if ret_val and type(img) != type(None):
-            imgs_array.append(img)
-        if len(imgs_array) == batch_size:
-            try:
-                dets += engine.batch_inference(imgs_array)
-            except:
-                print('Batch inference error!')
-            imgs_array = []
-        total_count += 1
-        """if total_count % 1000 == 0:
-            print(total_count)
-            time.sleep(1)"""
-    if len(imgs_array) > 0:
-        try:
-            dets += engine.batch_inference(imgs_array)
-        except:
-            print('Batch inference error!')
-        imgs_array = []
-    cap.release()
-    e_time = time.time()
-    print(f'Detection is done for {frames} frames in {(e_time - s_time)} seconds!')
-    return dets, height, width, fps 
-
-def get_all_detections_yolor(vid_path, dataset, engine, budget):
-    logger.debug('Detection YOLOR starts...')
-    s_time = time.time()
-    imgs_array = []
-    dets = []
-    cap = cv2.VideoCapture(vid_path)
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
-    frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    frames = frames if budget == -1 else min(frames, int(fps*60*budget))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    total_count = 0
-    batch_size = constants.DETECTION_BATCH_SIZE
-    dets = engine.inference(dataset)
-    cap.release()
-    e_time = time.time()
-    print(f'Detection is done for {frames} frames in {(e_time - s_time)} seconds!')
-    return dets, height, width, fps 
-
 def get_detection_frame_yolor(frame, engine):
     s_time = time.time()
     imgs_array = []
@@ -437,26 +240,7 @@ def get_detection_frame_yolor(frame, engine):
     # print(f'Detection is done for frames in {(e_time - s_time)} seconds!')
     return det   
 
-def detect(opt):
-    # Adding for KVS
-    source = get_kiesis_url()
-    logger.debug(source)
-    opt.source=source
-    # Support enabled for wharf in uat only
-    if os.environ["env"] == "prod" and get_camera_area() == 'wharf':
-        # At this stage we need to exit as it is not able to work for wharf
-        logger.info("At prod wharf currently model is not supported")
-        sys.exit()
-
-    global inf_1, inf_2, inf_3, inf_4, inf_5
-    t0 = time_synchronized()
-    ignored_classes = opt.ignored_classes
-    for idx in range(len(ignored_classes)):
-        ignored_classes[idx] = ignored_classes[idx].replace('_', ' ')
-    nms_max_overlap = opt.nms_max_overlap
-    max_cosine_distance = opt.max_cosine_distance
-    nn_budget = opt.nn_budget
-
+def get_deepsort_tracker(max_cosine_distance, nn_budget):
     # initialize deep sort
     model_filename = "ViT-B/16"
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -467,25 +251,41 @@ def detect(opt):
     metric = nn_matching.NearestNeighborDistanceMetric(
         "cosine", max_cosine_distance, nn_budget)
     
-    # load yolov5 model here
-      
-    engine = Yolor() if constants.USE_YOLOR_MODEL else Yolov5_IV() if constants.USE_IV_MODEL else Yolov5()
+    tracker = Tracker(metric)
+    return tracker, encoder
+
+def detect(opt):
+    # Initialize
+    set_logging()      
+
+    # Adding for KVS
+    source = get_kiesis_url()
+    logger.debug(source)
+    opt.source=source
+    # source, imgsz = opt.source, opt.img_size
+    
+    global inf_1, inf_2, inf_3, inf_4, inf_5
+    ignored_classes = opt.ignored_classes
+    for idx in range(len(ignored_classes)):
+        ignored_classes[idx] = ignored_classes[idx].replace('_', ' ')
+    
+    """ initialize deepsort tracker """
+    nms_max_overlap = opt.nms_max_overlap
+    tracker, encoder = get_deepsort_tracker(opt.max_cosine_distance, opt.nn_budget)
+    
+    """ load yolor model here """
+    engine = Yolor()
     global names
     names = engine.get_names()
+    
+    """ initialize segmentation model """
     workspace_detector = DetectWorkspace(opt.wharf)
-
-    # initialize tracker
-    tracker = Tracker(metric)
-
-    # source, imgsz = opt.source, opt.img_size
+    workspaces, workspace_contours = [], []
 
     # Directories
     save_dir = Path(increment_path(Path(opt.project) / opt.name,
                     exist_ok=opt.exist_ok))  # increment run
     save_dir.mkdir(parents=True, exist_ok=True)  # make dir
-
-    # Initialize
-    set_logging()      
 
     # init VideoCapture
     # url = get_kiesis_url()
@@ -515,23 +315,19 @@ def detect(opt):
     wharf_landing_Y = -1
     wharf_ground_height = 0
     hatch_reference = []
-    cargo_ids = []
 
-    suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = 0, 0, 0
-    workspaces, workspace_contours = [], []
+    suspended_threshold_hatch, suspended_threshold_wharf = 0, 0
     logger.debug('Safety zone detection starts...')
     # cv2.namedWindow("output", cv2.WINDOW_NORMAL)  
     while True:
-        # Capture frame-by-frame
         ret, frame = cap.read()
-        # if frame is read correctly ret is True
         if not ret:
             logger.debug("Can't receive frame (stream end?). Exiting ...")
             break
 
         c0 = time.time()
         if frame_count == 0:
-            distance_tracker = DistanceTracker(frame, opt.source, height, width, fps, ignored_classes, opt.danger_zone_width_threshold, opt.danger_zone_height_threshold, workspaces, workspace_contours, opt.wharf, opt.angle, save_dir, opt.save_result)
+            distance_tracker = DistanceTracker(frame, opt.source, height, width, fps, ignored_classes, opt.danger_zone_width_threshold, opt.danger_zone_height_threshold, workspaces, workspace_contours, opt.wharf, save_dir, opt.save_result)
 
         if (frame_count / fps) % 300 == 0 or len(workspaces) == 0: # detect work area once every 5 mins
             cargo_tracker.clear()
@@ -540,18 +336,15 @@ def detect(opt):
                 frame_count = frame_count+1
                 if frame_count == frames:
                     break
-                
-                # cv2.imshow("output", frame)
                 if cv2.waitKey(1) == ord('q'):
                     break
                 continue
+
             workspaces, center_points, workspace_contours = workspace_detector.segment_workspace(frame)
             if len(workspaces) == 0:
                 frame_count = frame_count+1
                 if frame_count == frames:
                     break
-                
-                # cv2.imshow("output", frame)
                 if cv2.waitKey(1) == ord('q'):
                     break
                 continue
@@ -559,14 +352,12 @@ def detect(opt):
             if len(workspaces) == 1:
                 logger.debug(f'*********************   only 1 work area')
                 work_area_index = 0
-                # if not opt.wharf:
-                #     cargo_tracker.set_step(3)
                 if opt.wharf:
                     _,_,_,wharf_ground_height = cv2.boundingRect(workspaces[0])
                     
                 distance_tracker.update_workarea(workspaces[work_area_index])
                 distance_tracker.calibrate_reference_area('')
-                suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
+                suspended_threshold_hatch, suspended_threshold_wharf = distance_tracker.get_suspended_threshold()
 
             distance_tracker.update_edgepoints(workspace_contours)
         
@@ -617,7 +408,7 @@ def detect(opt):
             if result:
                 distance_tracker.update_workarea(workspaces[work_area_index])
                 distance_tracker.calibrate_reference_area('')
-                suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
+                suspended_threshold_hatch, suspended_threshold_wharf = distance_tracker.get_suspended_threshold()
 
         cv2.drawContours(frame, workspace_contours, -1, (0, 0, 255), 5)
         
@@ -654,22 +445,20 @@ def detect(opt):
                 tracker.update(detections)
 
                 # update tracks
-                bboxes, classes, old_classes, distance_estimations,ids = update_tracks(work_area_index, workspaces, tracker, frame, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side, opt.angle, opt.distance_check, opt.wharf, frame_count, fps, not hasattr(distance_tracker, 'distance_w'), opt.no_nested)
-                #print("length of bboxes {}".format(bboxes))
-                #print("length of ids {}".format(len(ids)))
+                bboxes, classes, old_classes, ids = update_tracks(work_area_index, workspaces, tracker, frame, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, opt.wharf, frame_count, fps, not hasattr(distance_tracker, 'distance_w'))
                 
                 # track unloading cargo and detect main work area from candidates
                 result, work_area_index = cargo_tracker.track(work_area_index, ids, classes, bboxes, center_points, workspaces, workspace_contours)
                 if result:
                     distance_tracker.update_workarea(workspaces[work_area_index])
                     distance_tracker.calibrate_reference_area('')
-                    suspended_threshold_hatch, suspended_threshold_wharf, suspended_threshold_wharf_side = distance_tracker.get_suspended_threshold()
+                    suspended_threshold_hatch, suspended_threshold_wharf = distance_tracker.get_suspended_threshold()
 
                 c4 = time.time()
                 inf_4 = int((c4-c3) *1000)
 
                 # update distance tracker
-                distance_tracker.calculate_distance(work_area_index, bboxes, classes, old_classes, distance_estimations, frame, frame_count,ids, opt.thr_f_h, wharf_landing_Y, hatch_reference, db_manager)
+                distance_tracker.calculate_distance(work_area_index, bboxes, classes, old_classes, frame, frame_count,ids, opt.thr_f_h, wharf_landing_Y, hatch_reference, db_manager)
                 # Print time (inference + NMS)
                 c5 = time.time()
                 inf_5 = int((c5-c4) *1000)
@@ -679,9 +468,7 @@ def detect(opt):
             break
 
         elapsed_time = int((time.time()-c0)*1000)
-        # print(f'\t\t\t elapsed time {elapsed_time}: {inf_1}, {inf_2}, {inf_3}, {inf_4}, {inf_5}')
-        # Display the resulting frame
-        # cv2.imshow("output", frame)
+        print(f'\t\t\t elapsed time {elapsed_time}: {inf_1}, {inf_2}, {inf_3}, {inf_4}, {inf_5}')
         
         if cv2.waitKey(1) == ord('q'):
             break
@@ -697,9 +484,6 @@ if __name__ == '__main__':
     parser.add_argument('--source', required=True)
     parser.add_argument('--wharf', action='store_true')
     parser.add_argument('--save_result', action='store_true')
-    parser.add_argument('--angle', choices=['left', 'right'], default='left')
-    parser.add_argument('--no_nested', action='store_true')
-    parser.add_argument('--distance_check', action='store_true')
     parser.add_argument('--ignored_classes', nargs='+', default=['chain'])
     parser.add_argument('--danger_zone_width_threshold', type=float, default=400.0)
     parser.add_argument('--danger_zone_height_threshold', type=float, default=500.0)

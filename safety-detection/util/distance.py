@@ -5,7 +5,6 @@ import time
 import argparse
 import util.distance_utils as utills
 import util.distance_plot as plot
-from util.keypoint_detection import get_keypoints
 import constants
 import torch
 import torchvision.ops.boxes as bops
@@ -14,19 +13,16 @@ import util.threads as threads
 from util.db_manager import s3_sqs_handler, handle_annot_frames_buffer
 
 class DistanceTracker:
-    def __init__(self, frame, source, height, width, fps, ignored_classes, danger_zone_width_threshold, danger_zone_height_threshold, work_area, height_edges, wharf,angle, output_dir, save_result):
+    def __init__(self, frame, source, height, width, fps, ignored_classes, danger_zone_width_threshold, danger_zone_height_threshold, work_area, height_edges, wharf, output_dir, save_result):
         self.output_dir = output_dir
         # Get video height, width and fps
         self.height = height
         self.width = width
-        self.angle = angle
         self.save_result = save_result
         self.filename=source.split('/')[-1].split('.')[0]
-        # self.edge_points = constants.EDGE_AREA_DICT[source.split('/')[-1]]
         self.edge_points = height_edges
         self.reference_points = work_area
         self.calibrate_reference_area(source.split('/')[-1])
-        self.scale_w, self.scale_h = utills.get_scale(self.width, self.height)
         if self.save_result:
             fourcc = cv2.VideoWriter_fourcc(*"XVID")
             self.output_movie = cv2.VideoWriter(f"{output_dir}/{source.split('/')[-1].split('.')[0]}_dist.avi", fourcc, fps, (int(self.width*constants.OUTPUT_RES_RATIO), int(self.height*constants.OUTPUT_RES_RATIO)))
@@ -50,16 +46,15 @@ class DistanceTracker:
 
     def get_suspended_threshold(self):
         if len(self.reference_points) == 0:
-            return 0, 0, 0
-        return self.suspended_threshold_hatch, self.suspended_threshold_wharf, self.suspended_threshold_wharf_side
+            return 0, 0
+        return self.suspended_threshold_hatch, self.suspended_threshold_wharf
 
     def calibrate_reference_area(self, video_file):
-        # self.reference_points = constants.REFERENCE_AREA_DICT[video_file] #get_keypoints(frame)
         if len(self.reference_points) == 0:
             return
 
         if self.wharf:
-            self.suspended_threshold_wharf, self.suspended_threshold_hatch, self.suspended_threshold_wharf_side = self.height / 2, 0, 0
+            self.suspended_threshold_wharf, self.suspended_threshold_hatch = self.height / 2, 0
             return
 
         # print(self.reference_points)
@@ -73,7 +68,6 @@ class DistanceTracker:
         candidate_y = roi_long_edge
         self.suspended_threshold_hatch = max(candidate_y, roi_upper_y)
         self.suspended_threshold_wharf = self.height / 2
-        self.suspended_threshold_wharf_side = max(self.reference_points[0][0], self.reference_points[3][0]) if self.angle == 'right' else min(self.reference_points[1][0], self.reference_points[2][0])
         
     def calibrate_person_height_wharf(self, frame, bboxes, landing_Y, ground_height):
         pts = []
@@ -164,67 +158,8 @@ class DistanceTracker:
             delattr(self, 'distance_h')
             delattr(self, 'wharf_human_height')    
             delattr(self, 'hatch_human_height')    
-    
-    def get_bboxes(self, tracker, names):
-        boxes = []
-        classes = []
-        for track in tracker.tracks:
-            if not track.is_confirmed() or track.time_since_update > 1:
-                continue
-            xyxy = track.to_tlbr()
-            xywh = utills.xyxy2xywh(xyxy)
-            class_num = track.class_num
-            class_name = names[int(class_num)]
-            boxes.append(xywh)
-            classes.append(class_name)
-        return boxes, classes
-    
-    def is_inside(self, point, box):
-        x, y, w, h = box
-        return point[0] >= x and point[0] <= x+w and point[1] >= y and point[1] <= y+h
 
-    def preprocess_bboxes(self, boxes, classes):
-        for i in range(len(boxes)):
-            if classes[i] in ['Suspended Lean Object', 'People', 'chain'] + self.ignored_classes:
-                continue
-            x, y, w, h = boxes[i]
-            if y <= self.suspended_threshold:
-                classes[i] = 'Suspended Lean Object'
-        if not 'Suspended Lean Object' in classes:
-            for i, cls in enumerate(classes):
-                if cls == 'chain' and not 'chain' in self.ignored_classes:
-                    x, y, w, h = boxes[i]
-                    bottom1 = (x, y+h)
-                    bottom2 = (x+w, y+h)
-                    if y <= self.suspended_threshold:
-                        not_inside = True
-                        for i, box in enumerate(boxes):
-                            if classes[i] != 'People':
-                                if self.is_inside(bottom1, box) or self.is_inside(bottom2, box):
-                                    not_inside = False
-                        if not_inside:
-                            classes[i] = 'Suspended Lean Object'
-
-    def find_transformed_centers(self, boxes, classes):
-        centers = []
-        for i in range(len(boxes)):
-            if not classes[i] == 'Suspended Lean Object':
-                centers.append(None)
-                continue
-            center = (boxes[i][0] + boxes[i][2]/2, boxes[i][1] + boxes[i][3]/2)
-            d1 = np.sqrt((center[0] - self.reference_points[3][0]) ** 2 + (center[1] - self.reference_points[3][1]))
-            d2 = np.sqrt((center[0] - self.reference_points[2][0]) ** 2 + (center[1] - self.reference_points[2][1]))
-            x = self.width * d1 / (d1 + d2)
-            d3 = np.sqrt((center[0] - self.reference_points[1][0]) ** 2 + (center[1] - self.reference_points[1][1]))
-            y = self.height * d2 / (d2 + d3)
-            centers.append((x,y))
-        return centers
-
-    def calculate_distance(self, work_area_index, boxes, classes, old_classes, distance_estimations, frame, count,ids, thr_f_h, wharf_landing_Y, hatch_reference, db_manager):
-        # boxes = []
-        # classes = []
-        #boxes, classes = self.get_bboxes(tracker, names)
-        # self.preprocess_bboxes(boxes, classes)
+    def calculate_distance(self, work_area_index, boxes, classes, old_classes, frame, count,ids, thr_f_h, wharf_landing_Y, hatch_reference, db_manager):
         no_action=0
         roi_pts = np.array(self.reference_points, np.int32)
         cv2.polylines(frame, [roi_pts], True, (70, 70, 70), thickness=10)
