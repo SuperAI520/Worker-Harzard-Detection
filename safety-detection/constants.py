@@ -2,6 +2,7 @@ UNIT_LENGTH = 170
 DETECTION_MODEL_PATH = 'models/imgsize1280-yolor-mAP-0.86.pt'
 SEGMENTATION_MODEL_PATH = 'models/segmentation.pth'
 SEGMENTATION_WHARF_MODEL_PATH = 'models/segmentation_wharf.pth'
+CLIP_MODEL_PATH = 'models/ViT-B-16.pt'
 SEGMENTATION_CONFIG_PATH = 'mmsegmentation/configs/pspnet/pspnet_r50-d8_512x512_80k_workspace.py'
 DETECTION_CONF_THRESHOLD = 0.3
 OUTPUT_RES_RATIO = 1

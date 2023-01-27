@@ -242,7 +242,8 @@ def get_detection_frame_yolor(frame, engine):
 
 def get_deepsort_tracker(max_cosine_distance, nn_budget):
     # initialize deep sort
-    model_filename = "ViT-B/16"
+    # model_filename = "ViT-B/16"
+    model_filename = constants.CLIP_MODEL_PATH
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model, transform = clip.load(model_filename, device=device, jit=False)
     model.eval()
