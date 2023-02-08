@@ -132,7 +132,7 @@ def get_camera_area():
 
 def update_tracks(work_area_index, workspaces, tracker, im0, width, height, ignored_classes, suspended_threshold_hatch, suspended_threshold_wharf, wharf, frame_id, fps, no_action):
     if (no_action and not wharf) and work_area_index != -1:
-        return [], [], [],[],[]
+        return [], [], [], []
 
     boxes = []
     classes = []
