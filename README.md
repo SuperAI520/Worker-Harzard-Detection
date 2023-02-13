@@ -3,6 +3,7 @@
 ### Download models
 Download following pre-trained models to the specified paths:
 https://drive.google.com/file/d/1iizEQjiTetEzaBuzLqDgrWjFZL9XXw0n/view?usp=share_link
+https://drive.google.com/file/d/1hLolnZNNe_2rU2NitwYHt1Yw5bM2d68K/view?usp=share_link
 
 https://drive.google.com/file/d/1fEibG3OcvhyFFRsF2xDwfsw2i-4Z_qcJ/view?usp=share_link
 
@@ -48,13 +49,13 @@ After completing the environment installation, you can run the Safety Detection 
 ### Hatch environment
 ```
 cd safety-detection
-taskset --cpu-list 0 python clip_object_tracker.py --source videos/sample.avi --ignored_classes chain Forklift --danger_zone_width_threshold 800 --danger_zone_height_threshold 200 --no_nested
+taskset --cpu-list 0 python clip_object_tracker.py --source videos/sample.avi --ignored_classes chain Forklift --danger_zone_width_threshold 800 --danger_zone_height_threshold 200 --int8
 ```
 
 ### Wharf environment
 ```
 cd safety-detection
-taskset --cpu-list 0 python clip_object_tracker.py --source videos/sample.avi --ignored_classes chain Forklift --danger_zone_width_threshold 800 --danger_zone_height_threshold 200 --wharf --no_nested
+taskset --cpu-list 0 python clip_object_tracker.py --source videos/sample.avi --ignored_classes chain Forklift --danger_zone_width_threshold 800 --danger_zone_height_threshold 200 --wharf --int8
 ```
 
 An output video will be generated under the ```run/detect``` folder. The result is as shown below:

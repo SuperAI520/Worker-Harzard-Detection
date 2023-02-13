@@ -230,13 +230,25 @@ def get_color_for(class_num):
 
     return rgb
 
-def get_detection_frame_yolor(frame, engine):
+def get_detection_frame_yolor(frame, engine, ignored_classes):
     s_time = time.time()
     imgs_array = []
     imgsz = opt.img_size
-    
-    det = engine.inference_frame(frame, img_size = imgsz, auto_size = 64)
+    index_list = []
+    names = engine.get_names()
+    for ign_cls in ignored_classes:
+        if ign_cls == 'chain':
+            continue
+        index_list.append(names.index(ign_cls))
+    det = engine.inference_frame(frame, img_size = imgsz, auto_size = 64, ignored_idxs = index_list)
     e_time = time.time()
+    """
+    colors = [0, 255, 0]
+    for *xyxy, conf, cls in det:
+        label = '%s %.2f' % (names[int(cls)], conf)
+        plot_one_box(xyxy, frame, label=label, color=colors, line_thickness=3)
+    """
+
     # print(f'Detection is done for frames in {(e_time - s_time)} seconds!')
     return det   
 
@@ -275,7 +287,7 @@ def detect(opt):
     tracker, encoder = get_deepsort_tracker(opt.max_cosine_distance, opt.nn_budget)
     
     """ load yolor model here """
-    engine = Yolor()
+    engine = Yolor(opt.int8)
     global names
     names = engine.get_names()
     
@@ -332,7 +344,7 @@ def detect(opt):
 
         if (frame_count / fps) % 300 == 0 or len(workspaces) == 0: # detect work area once every 5 mins
             cargo_tracker.clear()
-            detection = get_detection_frame_yolor(frame, engine)
+            detection = get_detection_frame_yolor(frame, engine, ignored_classes)
             if len(detection) == 0:
                 frame_count = frame_count+1
                 if frame_count == frames:
@@ -374,7 +386,7 @@ def detect(opt):
             # if len(hatch_reference) != 0:
             #     frame = cv2.circle(frame, hatch_reference[0], 20, (0, 255, 0), 20)
 
-        detection = get_detection_frame_yolor(frame, engine)
+        detection = get_detection_frame_yolor(frame, engine, ignored_classes)
         c1 = time.time()
         inf_1 = int((c1-c0) *1000)
 
@@ -485,6 +497,7 @@ if __name__ == '__main__':
     parser.add_argument('--source', required=True)
     parser.add_argument('--wharf', action='store_true')
     parser.add_argument('--save_result', action='store_true')
+    parser.add_argument('--int8', action='store_true')
     parser.add_argument('--ignored_classes', nargs='+', default=['chain'])
     parser.add_argument('--danger_zone_width_threshold', type=float, default=400.0)
     parser.add_argument('--danger_zone_height_threshold', type=float, default=500.0)
