@@ -5,7 +5,7 @@ Download following pre-trained models to the specified paths:
 https://drive.google.com/file/d/1iizEQjiTetEzaBuzLqDgrWjFZL9XXw0n/view?usp=share_link
 https://drive.google.com/file/d/1hLolnZNNe_2rU2NitwYHt1Yw5bM2d68K/view?usp=share_link
 
-https://drive.google.com/file/d/1fEibG3OcvhyFFRsF2xDwfsw2i-4Z_qcJ/view?usp=share_link
+https://drive.google.com/file/d/1g646DkMzZ1mRk0CJIJxZfcnzWdaX8DU3/view?usp=share_link
 
 https://drive.google.com/file/d/1A70i9-OdeN84TO2p_sXZ8eR8Mb3vXiGl/view?usp=share_link
 
