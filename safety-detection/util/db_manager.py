@@ -15,7 +15,7 @@ from util.aws_utils import s3_transfer
 import util.threads as threads
 from loguru import logger
 
-category_name = 'Suspended Load & Fall From Height'
+category_name = 'Suspended Load & Worker on Edge'
 s3_lock = threading.Lock()
 class DBManager:
 	def __init__(self, source, width, height, fps, output_dir):

@@ -192,7 +192,7 @@ class DistanceTracker:
                 if new_sload_prox:
                     viol_text += 'Suspended_Load'
                 if new_Fall_F_H:
-                    viol_text += 'Fall_F_H_'
+                    viol_text += 'Worker_on_Edge'
 
                 snap_path, snap_imgname = db_manager.snap_image(img, viol_text)
                 # db_manager.record_start(img)
