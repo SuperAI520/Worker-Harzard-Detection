@@ -194,7 +194,7 @@ def calculate_edge_to_person(roi_edge,frame, ori_shape, boxes,classes,frame_id, 
 
             if all_violations[obj_id]['fall_fh_frame_buffers']['count'] >= thr_frames:
                 frame = cv2.rectangle(frame,(int(xj),int(yj)),(int(xj+wj),int(yj+hj)),red,3,lineType=cv2.LINE_AA)
-                label = 'Fall_F_H'
+                label = 'Worker_on_Edge'
                 t_size = cv2.getTextSize(label, 0, fontScale=1, thickness=tf)[0]
                 frame=cv2.rectangle(frame, (int(xj),int(yj)),(int(xj+t_size[0]),int(yj) - t_size[1] - 3), red, -1, cv2.LINE_AA)
                 frame = cv2.putText(frame, label, (int(xj), int(yj) - 2), 0, tl / 3, [225, 255, 255], thickness=tf, lineType=cv2.LINE_AA)
