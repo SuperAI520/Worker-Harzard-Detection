@@ -373,22 +373,22 @@ def detect(opt):
                 suspended_threshold_hatch, suspended_threshold_wharf = distance_tracker.get_suspended_threshold()
 
             distance_tracker.update_edgepoints(workspace_contours)
-        
-        if opt.wharf:
-            if cargo_tracker.get_wharf_landing_Y() > 0:
-                wharf_landing_Y = cargo_tracker.get_wharf_landing_Y()
-            # if wharf_landing_Y > 0:
-            #     pt1 = (0, wharf_landing_Y)
-            #     pt2 = (width, wharf_landing_Y)
-                # frame = cv2.line(frame, pt1, pt2, (0, 255, 0), 5)
-        else:
-            hatch_reference = cargo_tracker.get_hatch_reference()
-            # if len(hatch_reference) != 0:
-            #     frame = cv2.circle(frame, hatch_reference[0], 20, (0, 255, 0), 20)
 
         detection = get_detection_frame_yolor(frame, engine, ignored_classes)
         c1 = time.time()
         inf_1 = int((c1-c0) *1000)
+
+        if opt.wharf:
+            if cargo_tracker.get_wharf_landing_Y() > 0:
+                wharf_landing_Y = cargo_tracker.get_wharf_landing_Y()
+            # if wharf_landing_Y > 0:
+                # pt1 = (0, wharf_landing_Y)
+                # pt2 = (width, wharf_landing_Y)
+                # frame = cv2.line(frame, pt1, pt2, (0, 255, 0), 5)
+        else:
+            hatch_reference = cargo_tracker.get_hatch_reference()
+            # if len(hatch_reference) != 0:
+            #    frame = cv2.circle(frame, hatch_reference[0], 20, (0, 255, 0), 20)
 
         if work_area_index != -1 and not opt.wharf:
             if calibrated_frames < 10:

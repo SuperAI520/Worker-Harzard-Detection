@@ -116,7 +116,7 @@ def get_hatch_reference_points(hatch_reference):
     points.append((hatch_reference[0][0] - hatch_reference[1][0] // 2, hatch_reference[0][1] + hatch_reference[1][1] // 2))
     return points
 
-def get_distances(boxes, reference_points, hatch_reference, perspective_transform, inverse_perspective_transform, classes, old_classes, distance_w, distance_h, w, h, danger_zone_width_threshold, danger_zone_height_threshold, average_human_height, wharf):
+def get_distances(boxes, reference_points, hatch_reference, perspective_transform, inverse_perspective_transform, classes, old_classes, distance_w, distance_h, w, h, danger_zone_height_threshold, wharf):
     danger_zones = []
     danger_zone_checks = []
     suspended_cargo_ids = []
@@ -138,11 +138,8 @@ def get_distances(boxes, reference_points, hatch_reference, perspective_transfor
             bottom_points[i][1] = min(h, bottom_points[i][1])
             bottom_points[i][0] = max(0, bottom_points[i][0])
             bottom_points[i][0] = min(w, bottom_points[i][0])
-            if not wharf:
-                height_from_ground[i] = cal_dis(bottom_points[i], transformed_center_points[i], distance_w, distance_h)
-            else:
-                height_from_ground[i] = (roi_middle_y - (boxes[i][1] + boxes[i][3]/2)) * UNIT_LENGTH // average_human_height
-
+            
+            height_from_ground[i] = cal_dis(bottom_points[i], transformed_center_points[i], distance_w, distance_h)
             suspended_cargo_ids.append(i)
 
     for i in range(len(bottom_points)):
@@ -151,7 +148,7 @@ def get_distances(boxes, reference_points, hatch_reference, perspective_transfor
         danger_zone = None
         if height_from_ground[i] >= danger_zone_height_threshold:
             transformed_box = get_transformed_bbox(boxes[i], perspective_transform)
-            danger_zone = calculate_danger_zone_coordinates(old_classes[i], boxes[i], transformed_box, bottom_points[i], reference_points, transformed_hatch_reference_points, distance_w, distance_h, w, h, danger_zone_width_threshold, wharf)
+            danger_zone = calculate_danger_zone_coordinates(old_classes[i], boxes[i], transformed_box, bottom_points[i], reference_points, transformed_hatch_reference_points, distance_w, distance_h, w, h, wharf)
             danger_zones.append(danger_zone)
         for j in range(len(bottom_points)):
             if classes[j] != 'People':
@@ -160,7 +157,7 @@ def get_distances(boxes, reference_points, hatch_reference, perspective_transfor
             danger_zone_checks.append((i, j, None, in_danger)) 
     return suspended_cargo_ids, danger_zone_checks, bottom_points, danger_zones, height_from_ground
 
-def get_danger_zones_wharf(boxes, wharf_landing_Y, wharf_person_height_thr, reference_points, classes, old_classes, w, h, danger_zone_width_threshold, danger_zone_height_threshold):
+def get_danger_zones_wharf(boxes, wharf_landing_Y, wharf_person_height_thr, reference_points, classes, old_classes, w, h, danger_zone_height_threshold):
     danger_zones = []
     danger_zone_checks = []
     suspended_cargo_ids = []
@@ -174,7 +171,7 @@ def get_danger_zones_wharf(boxes, wharf_landing_Y, wharf_person_height_thr, refe
             bottom_points[i][1] = min(h, bottom_points[i][1])
             bottom_points[i][0] = max(0, bottom_points[i][0])
             bottom_points[i][0] = min(w, bottom_points[i][0])
-            height_from_ground[i] = wharf_landing_Y - (boxes[i][1] + boxes[i][3]/2)
+            height_from_ground[i] = wharf_landing_Y - (boxes[i][1] + boxes[i][3])
 
     for i in range(len(bottom_points)):
         if classes[i] != 'Suspended Lean Object':
@@ -182,16 +179,16 @@ def get_danger_zones_wharf(boxes, wharf_landing_Y, wharf_person_height_thr, refe
         danger_zone = None
         if height_from_ground[i] >= danger_zone_height_threshold:
             center_x = boxes[i][0] + boxes[i][2] / 2
-            if boxes[i][2] < (w // 3):
-                left_top = [center_x - boxes[i][2] * 3 / 4, wharf_landing_Y - boxes[i][3] / 4]
-                left_bottom = [center_x - boxes[i][2], wharf_landing_Y + boxes[i][3] / 4]
-                right_top = [center_x + boxes[i][2] * 3 / 4, wharf_landing_Y - boxes[i][3] / 4]
-                right_bottom = [center_x + boxes[i][2], wharf_landing_Y + boxes[i][3] / 4]
-            else:
-                left_top = [center_x - boxes[i][2] / 2, wharf_landing_Y - boxes[i][3] / 4]
-                left_bottom = [center_x - boxes[i][2] * 3 / 4, wharf_landing_Y + boxes[i][3] / 4]
-                right_top = [center_x + boxes[i][2] / 2, wharf_landing_Y - boxes[i][3] / 4]
-                right_bottom = [center_x + boxes[i][2] * 3 / 4, wharf_landing_Y + boxes[i][3] / 4]
+            # if boxes[i][2] < (w // 3):
+            #     left_top = [center_x - boxes[i][2] * 3 / 4, wharf_landing_Y - boxes[i][3] / 4]
+            #     left_bottom = [center_x - boxes[i][2], wharf_landing_Y + boxes[i][3] / 4]
+            #     right_top = [center_x + boxes[i][2] * 3 / 4, wharf_landing_Y - boxes[i][3] / 4]
+            #     right_bottom = [center_x + boxes[i][2], wharf_landing_Y + boxes[i][3] / 4]
+            # else:
+            left_top = [center_x - boxes[i][2] / 2, wharf_landing_Y - boxes[i][3] / 4]
+            left_bottom = [center_x - boxes[i][2] * 3 / 4, wharf_landing_Y + boxes[i][3] / 4]
+            right_top = [center_x + boxes[i][2] / 2, wharf_landing_Y - boxes[i][3] / 4]
+            right_bottom = [center_x + boxes[i][2] * 3 / 4, wharf_landing_Y + boxes[i][3] / 4]
 
             # danger_zone = [left_top, left_bottom, right_bottom, right_top]
             danger_poly = Polygon([left_top, left_bottom, right_bottom, right_top])
@@ -211,7 +208,7 @@ def get_danger_zones_wharf(boxes, wharf_landing_Y, wharf_person_height_thr, refe
 
     return suspended_cargo_ids, danger_zone_checks, bottom_points, danger_zones, height_from_ground
 
-def calculate_danger_zone_coordinates(old_class, box, transformed_box, center_pt, reference_points, hatch_reference_points, distance_w, distance_h, w, h, width_threshold, wharf):
+def calculate_danger_zone_coordinates(old_class, box, transformed_box, center_pt, reference_points, hatch_reference_points, distance_w, distance_h, w, h, wharf):
     if len(hatch_reference_points) != 0:
         box_w = max(math.dist(transformed_box[0], transformed_box[1]), math.dist(transformed_box[2], transformed_box[3]))
         box_h = max(math.dist(transformed_box[0], transformed_box[3]), math.dist(transformed_box[2], transformed_box[1]))
