@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import constants
 import math
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, MultiPolygon
 
 UNIT_LENGTH = constants.UNIT_LENGTH
 
@@ -194,6 +194,10 @@ def get_danger_zones_wharf(boxes, wharf_landing_Y, wharf_person_height_thr, refe
             danger_poly = Polygon([left_top, left_bottom, right_bottom, right_top])
             workarea_poly = Polygon(reference_points.squeeze(axis=1))
             danger_zone = danger_poly.intersection(workarea_poly)
+            if danger_zone.geom_type == 'MultiPolygon':
+                danger_zone =list(danger_zone.geoms)[0]
+            # elif danger_zone.geom_type == 'Polygon':
+            #     print('Polygon')
             int_coords = lambda x: np.array(x).round().astype(np.int32)
             danger_zone = int_coords(danger_zone.exterior.coords)
             danger_zones.append(danger_zone)

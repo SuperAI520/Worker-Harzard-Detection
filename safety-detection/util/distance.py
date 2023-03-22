@@ -22,6 +22,7 @@ class DistanceTracker:
         self.filename=source.split('/')[-1].split('.')[0]
         self.edge_points = height_edges
         self.reference_points = work_area
+        self.wharf = wharf
         self.calibrate_reference_area(source.split('/')[-1])
         if self.save_result:
             fourcc = cv2.VideoWriter_fourcc(*"XVID")
@@ -35,7 +36,6 @@ class DistanceTracker:
 
         self.ignored_classes = ignored_classes
         self.danger_zone_height_threshold = danger_zone_height_threshold
-        self.wharf = wharf
         self.all_violations=dict()
         self.fps=fps
 
