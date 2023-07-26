@@ -17,7 +17,7 @@ to the /safety-detection/models
 ### Install
 ```
 # Clone Safety Detection repository
-git clone https://github.com/groundup-ai/optimization_cv_suspended_load.git
+git clone https://github.com/JasonJin211/Safety-Detection.git
 
 # Install other dependencies
 cd safety-detection
