@@ -12,6 +12,8 @@ https://drive.google.com/file/d/1A70i9-OdeN84TO2p_sXZ8eR8Mb3vXiGl/view?usp=share
 https://drive.google.com/file/d/1M9b_Zt3zL-Gx8Yl7ZbHm8lro_hfL3sN1/view?usp=share_link
 to the /safety-detection/models
 
+To get permission for AI models, contact zlingxiao1028@gmail.com or Whatsapp: +14158003112
+
 <b> Check constants.py file for more details </b>
 
 ### Install
