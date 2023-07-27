@@ -2,14 +2,12 @@
 ## Installation
 ### Download models
 Download following pre-trained models to the specified paths:
-https://drive.google.com/file/d/1iizEQjiTetEzaBuzLqDgrWjFZL9XXw0n/view?usp=share_link
-https://drive.google.com/file/d/1hLolnZNNe_2rU2NitwYHt1Yw5bM2d68K/view?usp=share_link
 
-https://drive.google.com/file/d/1g646DkMzZ1mRk0CJIJxZfcnzWdaX8DU3/view?usp=share_link
+https://drive.google.com/file/d/1PWB60MR3FrZBj0UudmeDOne7bo34UVjF/view?usp=drive_link
 
-https://drive.google.com/file/d/1A70i9-OdeN84TO2p_sXZ8eR8Mb3vXiGl/view?usp=share_link
+https://drive.google.com/file/d/1gZSm-Te9MW3CLMML3bt7BMu1YdeKSpQa/view?usp=drive_link
 
-https://drive.google.com/file/d/1M9b_Zt3zL-Gx8Yl7ZbHm8lro_hfL3sN1/view?usp=share_link
+https://drive.google.com/file/d/17UfQ0o1uzkb3LgdqI5cm3QjPgFjVlAQc/view?usp=drive_link
 to the /safety-detection/models
 
 To get permission for AI models, contact zlingxiao1028@gmail.com or Whatsapp: +14158003112
@@ -62,7 +60,12 @@ taskset --cpu-list 0 python clip_object_tracker.py --source videos/sample.avi --
 
 An output video will be generated under the ```run/detect``` folder. The result is as shown below:
 
+https://github.com/JasonJin211/Safety-Detection/assets/60502049/8f7bc5a5-e2a7-493f-add7-a04f47e96e84
 
-https://user-images.githubusercontent.com/95361430/192615813-c3c89675-3e87-437b-bf18-12364063ba7a.mp4
+https://github.com/JasonJin211/Safety-Detection/assets/60502049/56ac6d2d-ac37-4f07-93bc-dd0eefdf2466
+
+
+
+
 
 
