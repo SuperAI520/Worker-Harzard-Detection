@@ -8,6 +8,7 @@ https://drive.google.com/file/d/1PWB60MR3FrZBj0UudmeDOne7bo34UVjF/view?usp=drive
 https://drive.google.com/file/d/1gZSm-Te9MW3CLMML3bt7BMu1YdeKSpQa/view?usp=drive_link
 
 https://drive.google.com/file/d/17UfQ0o1uzkb3LgdqI5cm3QjPgFjVlAQc/view?usp=drive_link
+
 to the /safety-detection/models
 
 To get permission for AI models, contact zlingxiao1028@gmail.com or Whatsapp: +14158003112
